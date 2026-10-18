@@ -39,7 +39,13 @@
       </div>
 
       <!-- 主背景 + 内容 -->
-      <div class="stage" :style="{ transform: `rotate(${rotateAngle}deg)` }">
+      <div
+        class="stage"
+        :style="{
+          transform: `rotate(${rotateAngle}deg)`,
+          backgroundImage: `url(${bodyBg})`,
+        }"
+      >
         <div class="count-box"> 我的抽奖次数：{{ drawTimes }} </div>
 
         <div class="deco-box">
@@ -121,7 +127,10 @@
 
 <script setup>
 /*
-  源站逻辑（pages-activity-lottery.BYKXMw1D.js）：
+  源站逻辑（pages-activity-lottery.BYKXMw1D.js，2026-10 复刻时快照；
+    站点后续重建为 pages-activity-lottery.o1pJ0lZW.js，逻辑主体不变，
+    但上游把 onLoad 里的 this.getPointsBalance() 调用删了 → 抽奖次数恒 0，
+    属上游回归；本地按复刻时快照的原行为保留调用）：
     data: { id, pointsBalance:0, lotteryInfo:{}, prizeList:[], isSpinning:false,
             rotateAngle:0, winPrizeIndex:-1, showLogModal:false, lotteryLogs:[],
             lotteryLogsFinished:false, lotteryLogsQuery:{pageNo:1} }
@@ -313,7 +322,9 @@ onMounted(() => {
   height: 57px;
   display: block;
 }
-/* 主舞台：源站 inline top:38px，内含 cj_bg 背景，整层随中奖结果旋转 */
+/* 主舞台：源站 inline top:38px，内含 cj_bg 背景，整层随中奖结果旋转。
+   背景图走模板 :style 注入（不用 CSS v-bind()：该写法在本项目构建链下
+   变量注入不生效，编译产物里 var(--xxx) 无人赋值，背景会丢）。 */
 .stage {
   position: absolute;
   z-index: 1;
@@ -321,7 +332,6 @@ onMounted(() => {
   left: 0;
   width: 100vw;
   height: 759px;
-  background-image: v-bind('`url(${bodyBg})`');
   background-repeat: no-repeat;
   background-size: 100% 100%;
 }

@@ -168,11 +168,11 @@ class Nft extends Base
 
         $total = (clone $query)->count();
 
-        // items 表无 sort 列，用 view_count 倒序 + id 兜底
-        // （源站市场页的默认排序是热度优先）
+        // 源站实测默认排序为 iid 倒序（最新发布的藏品排在前面，
+        // 与源站 /nft/secondary 返回顺序逐条比对确认）。
+        // items 表无独立 sort 列，iid 是雪花 ID，倒序即「最新优先」。
         $rows = $query
-            ->order('view_count', 'desc')
-            ->order('id', 'asc')
+            ->order('iid', 'desc')
             ->page($pageNo, $pageSize)
             ->select()
             ->toArray();
@@ -188,6 +188,11 @@ class Nft extends Base
 
     /**
      * GET /nft/secondary/{iid} —— 二级市场藏品详情
+     *
+     * ⚠️ 源站实测两个与列表接口的差异（2026-10-19 四个藏品逐一验证）：
+     *   1. 不返回 sells 数组（在售挂单走独立的 /nft/secondary/sell?iid=）
+     *   2. lastTradeAmount 恒为 null（列表接口同一藏品却有值 500/64500/...）
+     * 之前本地两处都没对齐：详情多吐 sells、lastTradeAmount 透传了缓存值。
      */
     public function secondaryDetail()
     {
@@ -202,32 +207,27 @@ class Nft extends Base
             throw ApiException::notFound();
         }
 
-        $arr = $row->toArray();
-
-        // 二级市场详情带 NFT 挂单列表
-        $sells = NftSellOrder::where('iid', $iid)
-            ->where('is_deleted', 0)
-            ->where('status', 1)
-            ->order('price', 'asc')
-            ->select()
-            ->toArray();
-
-        $result = Transformer::secondaryItem(self::withMarketStats($arr));
-        $result['sells'] = array_map(static fn ($s) => [
-            'nftId'        => Transformer::id($s['nft_id']),
-            'price'        => (int)$s['price'],
-            'quantity'     => (int)$s['quantity'],
-            'soldQuantity' => (int)$s['sold_quantity'],
-            'sellerId'     => Transformer::id($s['uid']),
-            'sellStatus'   => self::SELL_STATUS[(int)$s['status']] ?? '未上架',
-            'createTime'   => Transformer::ts(strtotime((string)$s['created_at']) * 1000),
-        ], $sells);
+        $result = Transformer::secondaryItem(self::withMarketStats($row->toArray()));
+        // 源站详情接口的 lastTradeAmount 恒为 null（与列表接口的有值行为不同）
+        $result['lastTradeAmount'] = null;
 
         return $result;
     }
 
     /**
      * GET /nft/secondary/sell —— 某藏品的在售挂单
+     */
+    /**
+     * GET /nft/secondary/sell —— 某藏品的在售挂单
+     *
+     * ⚠️ 源站实测：本接口返回的是 **NFT 对象数组**（18 字段），
+     *    不是挂单表原始行。每条 = 一个在售 NFT：
+     *      nftId/uid/iid/name/imageUrl/image/token/status/getTime/
+     *      price(挂售价)/payLock/payWay/chainId/chainCompleted/buyPrice/
+     *      item(null)/owner(null)/isSelf(false)
+     *    之前返回的是挂单形态（nftId/iid/price/quantity/soldQuantity/
+     *    sellerId/createTime），前端 `#{{ row.token }}` 直接渲染成
+     *    undefined——寄售 tab 的编号列全是错的。
      */
     public function secondarySell()
     {
@@ -240,15 +240,20 @@ class Nft extends Base
             ->select()
             ->toArray();
 
-        return array_map(static fn ($s) => [
-            'nftId'        => Transformer::id($s['nft_id']),
-            'iid'          => Transformer::id($s['iid']),
-            'price'        => (int)$s['price'],
-            'quantity'     => (int)$s['quantity'],
-            'soldQuantity' => (int)$s['sold_quantity'],
-            'sellerId'     => Transformer::id($s['uid']),
-            'createTime'   => Transformer::ts(strtotime((string)$s['created_at']) * 1000),
-        ], $rows);
+        // 一次性把关联 NFT 查出来，避免 N+1
+        $nftIds = array_map(static fn ($s) => (string)$s['nft_id'], $rows);
+        $nfts = [];
+        if ($nftIds) {
+            $nftRows = NftModel::whereIn('nft_id', $nftIds)->select()->toArray();
+            foreach ($nftRows as $n) {
+                $nfts[(string)$n['nft_id']] = $n;
+            }
+        }
+
+        return array_map(
+            static fn ($s) => Transformer::secondarySellItem($s, $nfts[(string)$s['nft_id']] ?? null),
+            $rows
+        );
     }
 
     /**
@@ -770,6 +775,22 @@ class Nft extends Base
     {
         $iid = (string)($row['iid'] ?? '');
 
+        // 市场统计以 items 表缓存列为准（源站同款架构：items 表维护
+        // sell_quantity/min_price/max_price/trade_quantity/today_trade_*
+        // 等缓存列，/nft/secondary 直接透传，不对成交表实时 COUNT——
+        // 源站臻海蓝卡成交 31 万+笔，实时聚合不现实）。
+        //
+        // 仅当缓存表明「无任何市场数据」（在售 0、成交 0、无地板价）时，
+        // 才回退到挂单/成交表实时聚合——覆盖演示环境新建藏品、
+        // 灌了挂单但没回填 items 缓存的场景。
+        $cacheEmpty = (int)($row['sell_quantity'] ?? 0) === 0
+            && (int)($row['trade_quantity'] ?? 0) === 0
+            && ($row['min_price'] ?? null) === null;
+        if (!$cacheEmpty) {
+            return $row;
+        }
+
+        // ---- 以下为兜底：实时聚合 ----
         // 从挂单表聚合
         $sells = NftSellOrder::where('iid', $iid)
             ->where('is_deleted', 0)
@@ -812,13 +833,9 @@ class Nft extends Base
         $row['today_trade_quantity'] = $todayQty;
         $row['today_trade_amount']   = $todayAmt > 0 ? $todayAmt : null;
 
-        // 源站实测这几个恒为 null，原样透传
-        $row['last_trade_amount']     = null;
-        $row['hour_trade_quantity']   = null;
-        $row['today_trade_max_amount']= null;
-        $row['today_trade_min_amount']= null;
-        $row['price_change']          = null;
-
+        // last_trade_amount / hour_trade_quantity / today_trade_max_amount /
+        // today_trade_min_amount / price_change 源站本就返回 null 或不产源，
+        // 缓存列为 null 时保持 null，不做臆造
         return $row;
     }
 }

@@ -7,6 +7,8 @@
 注意：
   - 3D 相关的页面（activity/test、index/info、my/nft/info）在沙箱里会报
     WebGL 上下文错误，这是环境限制不是代码缺陷，单独归类为「沙箱限制」。
+  - 无文字设计的页面（activity/chouqian、index/webView）不用 innerText 判定，
+    改用 DOM 结构证据（底图/顶栏/iframe），见 NO_TEXT_BY_DESIGN 注释。
 
 用法：python3 scripts/sweep_all_pages.py
 """
@@ -30,6 +32,13 @@ WEBGL_PAGES = {"pages/activity/test", "pages/index/info", "pages/my/nft/info"}
 # 巡检用的是全新测试账号（名下 0 个 NFT），源站在同样条件下也会跳走，
 # 因此这属于**环境数据缺失**，不是路由缺陷，单独标注不计为失败。
 NEEDS_OWN_NFT = {"pages/my/nft/info", "pages/my/nft/sale"}
+
+# 无文字设计的页面 —— innerText 判定会误报「渲染空白」，改用 DOM 结构证据：
+#   chouqian：源站 chunk（pages-activity-chouqian.BkaJYz7w.js）只渲染 top-bar +
+#             返回图标，CSS（chouqian-DsZ5Zxx-.css）把 qmcq_background 底图挂在
+#             uni-page-body 上，整页无任何文字（已用浏览器对比站内渲染确认）。
+#   webView：内容是跨域 iframe，iframe 内的文字不算进 #app 的 innerText。
+NO_TEXT_BY_DESIGN = {"pages/activity/chouqian", "pages/index/webView"}
 
 # 需要登录态才有意义的页面，token 缺失时可能显示空态但不崩溃
 AUTH_PAGES = {
@@ -108,6 +117,34 @@ def load_paths():
     return re.findall(r"path: '(/pages/[^']+)'", src)
 
 
+def dom_evidence(pg, key):
+    """无文字页面的 DOM 结构证据（替代 innerText 判定）。
+
+    返回 None 表示证据不足（判失败）；返回字符串表示通过，字符串为证据描述。
+    """
+    if key == "pages/activity/chouqian":
+        return pg.evaluate("""() => {
+            const app = document.querySelector('#app');
+            const root = app && app.querySelector('.cqPage');
+            if (!root) return null;
+            const bg = getComputedStyle(root).backgroundImage;
+            const bar = root.querySelector('.top-bar');
+            const back = root.querySelector('.top-back');
+            const h = root.getBoundingClientRect().height;
+            if (!bg || bg === 'none' || !bar || !back || h < 100) return null;
+            return `底图+顶栏+返回箭头 h=${Math.round(h)}px`;
+        }""")
+    if key == "pages/index/webView":
+        return pg.evaluate("""() => {
+            const f = document.querySelector('#app iframe');
+            if (!f) return null;
+            const src = f.getAttribute('src') || '';
+            if (!src) return null;
+            return `iframe src=${src}`;
+        }""")
+    return None
+
+
 def main():
     paths = load_paths()
     print("=" * 60)
@@ -167,6 +204,15 @@ def main():
                 if not route_ok:
                     failed.append((path, f"路由落点错误 -> {landed}"))
                     print(f"  ✗ {path:38s} 路由落点错误 -> {landed}")
+                elif not body and key in NO_TEXT_BY_DESIGN:
+                    # 无文字设计页：用 DOM 结构证据判定（见 NO_TEXT_BY_DESIGN 注释）
+                    ev = dom_evidence(pg, key)
+                    if ev:
+                        ok.append(path)
+                        print(f"  ✓ {path:38s} {'':>5} [无文字设计] {ev}")
+                    else:
+                        blank.append((path, "结构证据不足"))
+                        print(f"  ✗ {path:38s} 渲染空白（结构证据不足）")
                 elif not body:
                     blank.append((path, "渲染空白"))
                     print(f"  ✗ {path:38s} 渲染空白")
@@ -189,13 +235,15 @@ def main():
         b.close()
 
     print("\n" + "=" * 60)
-    print(f" 通过 {len(ok)} / 失败 {len(failed)} / 共 {len(paths)}")
-    if failed:
+    # blank 与 failed 分开计数，避免空白页被吞（56+0+2≠58 的历史坑）
+    bad = failed + blank
+    print(f" 通过 {len(ok)} / 失败 {len(bad)}（路由错误 {len(failed)} + 渲染空白 {len(blank)}）/ 共 {len(paths)}")
+    if bad:
         print("\n失败明细:")
-        for path, why in failed:
+        for path, why in bad:
             print(f"  {path:38s} {why}")
     print("=" * 60)
-    return 0 if not failed else 1
+    return 0 if not bad else 1
 
 
 if __name__ == "__main__":

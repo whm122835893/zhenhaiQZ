@@ -118,6 +118,18 @@ final class Transformer
     }
 
     /**
+     * 可空金额字段：null 原样返回，非 null 按分转 int
+     *
+     * 与 amount() 的区别只是容忍 null——行情字段（minPrice /
+     * lastTradeAmount / todayTradeAmount 等）在无数据时源站返回 null，
+     * 有数据时返回 int，两种形态都要能出。
+     */
+    public static function amountOrNull(mixed $cents): ?int
+    {
+        return $cents === null || $cents === '' ? null : (int)$cents;
+    }
+
+    /**
      * 可空统计字段
      *
      * 实测：源站 priceChange / minPrice / tradeAmount / hourTradeQuantity /
@@ -157,6 +169,44 @@ final class Transformer
             'payWay'        => $row['pay_way'] === null ? null : (int)$row['pay_way'],
             'chainId'       => (string)($row['chain_id'] ?? ''),
             'chainCompleted'=> (bool)($row['chain_completed'] ?? false),
+        ];
+    }
+
+    /**
+     * 二级市场在售挂单项（GET /nft/secondary/sell 的数组元素）
+     *
+     * 源站实测：返回的是 **NFT 对象**（18 字段），不是挂单行。
+     * 形态 = Transformer::nft() 的字段 + price 被挂售价覆盖 +
+     * item/owner/isSelf 三个列表态 null/false 值。
+     *
+     * @param array $order nft_sell_orders 行
+     * @param array|null $nft 关联的 nfts 行（缺失时退化为占位值）
+     */
+    public static function secondarySellItem(array $order, ?array $nft): array
+    {
+        $nft = $nft ?? [];
+        return [
+            'nftId'         => self::id($order['nft_id'] ?? ''),
+            // 挂单归属的卖家（源站同款：取挂单 uid，不是 NFT 持有者）
+            'uid'           => self::id($order['uid'] ?? ''),
+            'iid'           => self::id($order['iid'] ?? ''),
+            'name'          => (string)($nft['name'] ?? ''),
+            'image'         => (string)($nft['image'] ?? ''),
+            'imageUrl'      => (string)($nft['image_url'] ?? ''),
+            'token'         => (int)($nft['token'] ?? 0),
+            'status'        => (int)($order['status'] ?? 0),
+            'getTime'       => self::ts($nft['get_time'] ?? 0),
+            // ⚠️ price 是【挂售价】，覆盖 NFT 自身的 price 列
+            'price'         => (int)($order['price'] ?? 0),
+            'payLock'       => (bool)($nft['pay_lock'] ?? false),
+            'payWay'        => $nft['pay_way'] === null ? null : (int)$nft['pay_way'],
+            'chainId'       => (string)($nft['chain_id'] ?? ''),
+            'chainCompleted'=> (bool)($nft['chain_completed'] ?? false),
+            'buyPrice'      => (int)($nft['buy_price'] ?? 0),
+            // 列表态固定值（源站实测）
+            'item'          => null,
+            'owner'         => null,
+            'isSelf'        => false,
         ];
     }
 
@@ -225,22 +275,56 @@ final class Transformer
      */
     public static function secondaryItem(array $row): array
     {
-        $out = self::item($row);
-        $out += [
-            'sellQuantity'         => (int)($row['sell_quantity'] ?? 0),
-            'minPrice'             => self::nullable($row['min_price'] ?? null),
-            'maxPrice'             => self::nullable($row['max_price'] ?? null),
-            'tradeQuantity'        => (int)($row['trade_quantity'] ?? 0),
-            'tradeAmount'          => self::nullable($row['trade_amount'] ?? null),
-            'lastTradeAmount'      => self::nullable($row['last_trade_amount'] ?? null),
-            'todayTradeQuantity'   => (int)($row['today_trade_quantity'] ?? 0),
-            'hourTradeQuantity'    => self::nullable($row['hour_trade_quantity'] ?? null),
-            'todayTradeAmount'     => self::nullable($row['today_trade_amount'] ?? null),
-            'todayTradeMaxAmount'  => self::nullable($row['today_trade_max_amount'] ?? null),
-            'todayTradeMinAmount'  => self::nullable($row['today_trade_min_amount'] ?? null),
-            'priceChange'          => self::nullable($row['price_change'] ?? null),
+        // ⚠️ 不能用 `self::item($row) + 行情字段` 拼装。
+        //    源站实测：GET /nft/secondary 与 /nft/secondary/{iid} 都只返回
+        //    **31 个字段的行情子集**，不含 cid / authorId / price / startTime
+        //    / endTime / ownQuantity 等 17 个 item 基础字段。
+        //    之前那样拼会多吐 17 个字段，前端虽只取所需不报错，
+        //    但契约比源站宽松，且把不该暴露给未登录游客的字段也带出去了。
+        //    这里按源站实测做**显式白名单**，逐字段对齐。
+        $base = self::item($row);
+
+        return [
+            // ---- 藏品基础（源站保留的部分）----
+            'iid'                    => $base['iid'],
+            'contract'               => $base['contract'],
+            'name'                   => $base['name'],
+            'image'                  => $base['image'],
+            'imageUrl'               => $base['imageUrl'],
+            'content'                => $base['content'],
+            'type'                   => $base['type'],
+            'issueQuantity'          => $base['issueQuantity'],
+            'nftQuantity'            => $base['nftQuantity'],
+            'isGive'                 => $base['isGive'],
+            'isFollow'               => $base['isFollow'],
+            'isSecondary'            => $base['isSecondary'],
+            'isSecondaryBatch'       => $base['isSecondaryBatch'],
+            'isSecondaryApply'       => $base['isSecondaryApply'],
+            'isSecondaryTrust'       => $base['isSecondaryTrust'],
+            'secondaryLowPrice'      => $base['secondaryLowPrice'],
+            'secondaryHighPrice'     => $base['secondaryHighPrice'],
+            'secondaryApplyLowPrice' => $base['secondaryApplyLowPrice'],
+            'secondaryApplyHighPrice'=> $base['secondaryApplyHighPrice'],
+
+            // ---- 行情统计 ----
+            // 分值字段（源站返回 int，单位：分）必须走 amount() 转 int：
+            // decimal 列从 MySQL 读出来是 "18700.00" 这样的字符串，
+            // 原样透传会把契约从 int 退化成 string（前端 JS 虽能 coerc，
+            // 但严格比对时类型不一致）。
+            'sellQuantity'           => (int)($row['sell_quantity'] ?? 0),
+            'minPrice'               => self::amountOrNull($row['min_price'] ?? null),
+            'maxPrice'               => self::amountOrNull($row['max_price'] ?? null),
+            'tradeQuantity'          => (int)($row['trade_quantity'] ?? 0),
+            'tradeAmount'            => self::amountOrNull($row['trade_amount'] ?? null),
+            'lastTradeAmount'        => self::amountOrNull($row['last_trade_amount'] ?? null),
+            'todayTradeQuantity'     => (int)($row['today_trade_quantity'] ?? 0),
+            'hourTradeQuantity'      => self::amountOrNull($row['hour_trade_quantity'] ?? null),
+            'todayTradeAmount'       => self::amountOrNull($row['today_trade_amount'] ?? null),
+            'todayTradeMaxAmount'    => self::amountOrNull($row['today_trade_max_amount'] ?? null),
+            'todayTradeMinAmount'    => self::amountOrNull($row['today_trade_min_amount'] ?? null),
+            // 涨跌幅是小数百分比（源站实测恒 null），非 null 时按 float 出
+            'priceChange'            => $row['price_change'] === null ? null : (float)$row['price_change'],
         ];
-        return $out;
     }
 
     /**

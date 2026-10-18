@@ -218,7 +218,7 @@ CREATE TABLE `items` (
   `last_trade_amount`        decimal(20,2) NULL DEFAULT NULL COMMENT '最新成交价(分,可为null)',
   `today_trade_quantity`     int NOT NULL DEFAULT 0,
   `hour_trade_quantity`      int NULL DEFAULT NULL COMMENT '小时成交数(源站可为null)',
-  `today_trade_amount`       decimal(20,2) NOT NULL DEFAULT 0.00 COMMENT '今日成交额(分)',
+  `today_trade_amount`       decimal(20,2) DEFAULT NULL COMMENT '今日成交额(分)。源站“今日无成交”返回 null，故必须可空，不能 NOT NULL DEFAULT 0',
   `today_trade_max_amount`   decimal(20,2) NULL DEFAULT NULL COMMENT '今日最高价(可为null)',
   `today_trade_min_amount`   decimal(20,2) NULL DEFAULT NULL COMMENT '今日最低价(可为null)',
   `price_change`             decimal(10,4) NULL DEFAULT NULL COMMENT '涨跌幅(源站常为null)',

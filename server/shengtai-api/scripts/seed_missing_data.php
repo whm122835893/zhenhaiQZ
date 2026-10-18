@@ -64,6 +64,54 @@ function seedRow(string $table, array $row, array $keys, bool $apply, array &$lo
     $log[] = ['insert', $label, $apply ? '已写入' : '待写入'];
 }
 
+/**
+ * 按唯一键更新（存在则改，不存在则插）。
+ *
+ * 行情统计这类会随时间变化的字段要能反复回写，
+ * seedRow() 只插不改，满足不了，故单独提供。
+ */
+function upsertRow(string $table, array $row, array $keys, bool $apply, array &$log): void
+{
+    $where = [];
+    foreach ($keys as $k) {
+        $where[] = [$k, '=', $row[$k]];
+    }
+    $label = $table . '[' . implode(',', array_map(fn($k) => $k . '=' . $row[$k], $keys)) . ']';
+    $exists = Db::name($table)->where($where)->find();
+
+    if (!$exists) {
+        if ($apply) {
+            Db::name($table)->insert($row);
+        }
+        $log[] = ['insert', $label, $apply ? '已写入' : '待写入'];
+        return;
+    }
+
+    // 只回写真正有差异的字段，避免无谓的 updated_at 抖动
+    $diff = [];
+    foreach ($row as $k => $v) {
+        if (!array_key_exists($k, $exists)) {
+            continue;
+        }
+        $old = $exists[$k];
+        // 数据库读出来的是字符串，比较前统一按标量规范化
+        $same = (is_null($v) && is_null($old))
+            || (is_scalar($v) && is_scalar($old) && (string)$v === (string)$old);
+        if (!$same) {
+            $diff[$k] = $v;
+        }
+    }
+
+    if ($diff === []) {
+        $log[] = ['skip', $label, '值已一致'];
+        return;
+    }
+    if ($apply) {
+        Db::name($table)->where($where)->update($row);
+    }
+    $log[] = ['update', $label, ($apply ? '已更新 ' : '待更新 ') . implode(',', array_keys($diff))];
+}
+
 /* ============================================================
    1. banners —— 首页 / 市场页轮播
    源站实测：GET /basic/banner 返回 **空数组**。
@@ -196,6 +244,68 @@ $prizes = [
 ];
 foreach ($prizes as $p) {
     seedRow('activity_lottery_prizes', $p, ['id'], $apply, $log);
+}
+
+/* ============================================================
+   2.5 items 行情统计 —— 按源站 GET /nft/secondary 实测快照回写
+   源站市场列表返回 31 个字段的行情子集，其中这些统计值本地库里
+   原先没维护（恒为 0 / null），导致：
+     本次成交价 / 最高最低价 / 成交额 与源站对不上，
+     逐字段比对出现 14 项「类型不一致」（本地 int 对源站 null，或反之）。
+   这里按源站实测逐条回写。
+   ⚠️ 行情是时变数据，这里落的是抓取时刻的快照；
+      需要刷新时重新抓一次源站再跑本脚本即可（幂等）。
+   ⚠️ 快照版本：2026-10-19 晚间（上版 2026-10-19 早间快照已漂移：
+      张果老在售 185→184、成交 295→303、今日笔数 56→64、今日额 3923900→4483600；
+      蓝采和成交 2747→2748、今日笔数 1→2、今日额 50000→100000；
+      纸驴云符/臻海蓝卡计数不变；另修正蓝采和寄售/信任标
+      （源站 apply=false trust=true，上版快照把两者写反了）。
+   ============================================================ */
+$marketStats = [
+    // iid => [在售, 最低, 最高, 成交笔数, 成交额, 最近成交, 今日笔数, 今日额, 流通量]
+    2111444462816284674 => [184, 18700, 28800, 2544, null, 26500, 121, 2322400, 4521],
+    2111444138344927233 => [92, 68000, 200000, 303, null, 64500, 64, 4483600, 1000],
+    2111310949005721602 => [0, null, null, 653, null, 100000, 0, null, 1481],
+    2109928427009183745 => [8676, 500, 500, 314362, null, 500, 255, 102000, 138729],
+    2109922045660860418 => [0, null, null, 2748, null, 50000, 2, 100000, 1358],
+];
+foreach ($marketStats as $iid => $s) {
+    upsertRow('items', [
+        'iid'                   => $iid,
+        'sell_quantity'         => $s[0],
+        'min_price'             => $s[1],
+        'max_price'             => $s[2],
+        'trade_quantity'        => $s[3],
+        'trade_amount'          => $s[4],
+        'last_trade_amount'     => $s[5],
+        'today_trade_quantity'  => $s[6],
+        'today_trade_amount'    => $s[7],
+        'nft_quantity'          => $s[8],
+        // 源站实测这几个恒为 null，不填
+        'today_trade_max_amount' => null,
+        'today_trade_min_amount' => null,
+        'hour_trade_quantity'    => null,
+        'price_change'           => null,
+        'updated_at'             => $ts,
+    ], ['iid'], $apply, $log);
+}
+
+/* ============================================================
+   2.6 items 二级市场开关位 —— 按源站 /nft/secondary 快照修正
+   上版快照把蓝采和的 is_secondary_apply / is_secondary_trust
+   写反了（源站实测：apply=false、trust=true）。
+   ============================================================ */
+$secondaryFlags = [
+    // iid => [is_secondary_apply, is_secondary_trust]
+    2109922045660860418 => [0, 1],
+];
+foreach ($secondaryFlags as $iid => $f) {
+    upsertRow('items', [
+        'iid'                 => $iid,
+        'is_secondary_apply'  => $f[0],
+        'is_secondary_trust'  => $f[1],
+        'updated_at'          => $ts,
+    ], ['iid'], $apply, $log);
 }
 
 /* ============================================================
