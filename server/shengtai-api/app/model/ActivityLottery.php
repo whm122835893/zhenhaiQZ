@@ -17,7 +17,10 @@ class ActivityLottery extends BaseModel
 
     protected $type = [
         'points' => 'integer',
-        'status' => 'integer',
+        // ⚠️ schema 里 `status` 是 varchar(32) DEFAULT 'active'（字符串枚举）。
+        //    之前这里写成 'integer'，ThinkPHP 会把 'active' 强转成 0，
+        //    于是 `where('status','active')` 永远匹配不上、接口恒返回 null。
+        'status' => 'string',
     ];
 
     protected $allowField = [

@@ -49,7 +49,7 @@ class Activity extends Base
 
         // 当前进行中的抽奖
         $now = $this->nowMillis();
-        $activeLottery = ActivityLottery::where('status', 1)
+        $activeLottery = ActivityLottery::where('status', 'active')
             ->where('is_deleted', 0)
             ->where('start_time', '<=', $now)
             ->where('end_time', '>=', $now)
@@ -76,16 +76,28 @@ class Activity extends Base
      */
     public function lotteryActive()
     {
-        $now = $this->nowMillis();
-
-        $row = ActivityLottery::where('status', 1)
+        // ⚠️ 源站实测：本端点**只按 status 过滤，不检查时间窗口**。
+        //    证据：源站当前活动的 endTime 已是过去时间（2026-10-18 19:30），
+        //    接口仍返回该活动。故这里也不要加 start_time/end_time 条件，
+        //    否则本地会返回 null 而与源站不一致。
+        $row = ActivityLottery::where('status', 'active')
             ->where('is_deleted', 0)
-            ->where('start_time', '<=', $now)
-            ->where('end_time', '>=', $now)
             ->order('id', 'desc')
             ->find();
 
-        return $row ? $this->lotteryRow($row->toArray()) : null;
+        if (!$row) {
+            // ⚠️ 不能 `return null` —— ThinkPHP 会把控制器的 null 返回值
+            //    序列化成空字符串，响应变成 data:"" 而不是 data:null。
+            //    直接返回 json() 才能拿到真正的 JSON null。
+            return json([
+                'status'  => true,
+                'code'    => \app\exception\ApiException::CODE_SUCCESS,
+                'message' => null,
+                'data'    => null,
+            ]);
+        }
+
+        return $this->lotteryRow($row->toArray());
     }
 
     /**
@@ -93,7 +105,7 @@ class Activity extends Base
      */
     public function lotteryList()
     {
-        $rows = ActivityLottery::where('status', 1)
+        $rows = ActivityLottery::where('status', 'active')
             ->where('is_deleted', 0)
             ->order('id', 'desc')
             ->select()
@@ -118,27 +130,8 @@ class Activity extends Base
             throw ApiException::notFound();
         }
 
-        $data = $this->lotteryRow($row->toArray());
-
-        $prizes = ActivityLotteryPrize::where('lottery_id', $id)
-            ->order('sort', 'asc')
-            ->order('id', 'asc')
-            ->select()
-            ->toArray();
-
-        // 图片用平铺双字段（源站形态）：image=相对路径，imageUrl=绝对地址。
-        // 之前写成 'image' => Transformer::image(...) 会得到嵌套对象，
-        // 前端 :src 拿到对象直接渲染成破图。
-        $data['prizes'] = array_map(static fn ($p) => [
-            'prizeId'     => Transformer::id($p['id']),
-            'name'        => (string)$p['name'],
-            ...Transformer::imagePair($p['image'] ?? '', 'image'),
-            'level'       => (string)$p['level'],
-            'probability' => (int)$p['probability'],
-            'quantity'    => (int)$p['quantity'],
-        ], $prizes);
-
-        return $data;
+        // prizes 已由 lotteryRow() 组装（源站 active 与 detail 都带奖品列表）
+        return $this->lotteryRow($row->toArray());
     }
 
     /**
@@ -352,7 +345,7 @@ class Activity extends Base
         }
 
         $lottery = ActivityLottery::where('id', $id)
-            ->where('status', 1)
+            ->where('status', 'active')
             ->where('is_deleted', 0)
             ->find();
 
@@ -421,7 +414,7 @@ class Activity extends Base
     {
         $uid = $this->uid();
 
-        $prizes = ActivityRecastPrize::where('status', 1)->select()->toArray();
+        $prizes = ActivityRecastPrize::where('status', 'active')->select()->toArray();
         if ($prizes === []) {
             throw ApiException::notFound();
         }
@@ -570,18 +563,47 @@ class Activity extends Base
 
     /**
      * 抽奖活动行转换
+     *
+     * ⚠️ 源站 GET /activity/lottery/active 的响应里**带 prizes 数组**，
+     *    与 GET /activity/lottery/{id} 一致。之前只有详情接口组装 prizes，
+     *    导致 active 接口返回的对象没有 prizes，抽奖页拿不到奖品列表。
      */
     private function lotteryRow(array $r): array
     {
-        return [
+        $row = [
             'id'        => Transformer::id($r['id']),
             'name'      => (string)$r['name'],
             ...Transformer::imagePair($r['cover'] ?? '', 'cover'),
             'points'    => (int)$r['points'],
-            'startTime' => Transformer::ts($r['start_time']),
-            'endTime'   => Transformer::ts($r['end_time']),
+            // ⚠️ start_time / end_time 在库里是 **datetime**，必须用 datetimeTs()
+            //    换算成 13 位毫秒字符串。之前误用 ts()（(string)(int)$v），
+            //    '2026-10-18 15:30:00' 被 (int) 截断成 2026，接口返回了 "2026"。
+            'startTime' => Transformer::datetimeTs($r['start_time']),
+            'endTime'   => Transformer::datetimeTs($r['end_time']),
             'rule'      => (string)$r['rule'],
-            'status'    => (int)$r['status'],
+            // ⚠️ 源站实测 status 是**布尔**（true = 启用），不是 0/1。
+            //    库里 varchar(32) DEFAULT 'active'，故按「等于 active 或 1」判布尔。
+            'status'    => in_array((string)$r['status'], ['1', 'active'], true),
         ];
+
+        $prizes = ActivityLotteryPrize::where('lottery_id', (string)$r['id'])
+            ->order('sort', 'asc')
+            ->order('id', 'asc')
+            ->select()
+            ->toArray();
+
+        // 图片用平铺双字段（源站形态）：image=相对路径，imageUrl=绝对地址。
+        // 之前写成 'image' => Transformer::image(...) 会得到嵌套对象，
+        // 前端 :src 拿到对象直接渲染成破图。
+        $row['prizes'] = array_map(static fn ($p) => [
+            'prizeId'     => Transformer::id($p['id']),
+            'name'        => (string)$p['name'],
+            ...Transformer::imagePair($p['image'] ?? '', 'image'),
+            'level'       => (string)$p['level'],
+            'probability' => (int)$p['probability'],
+            'quantity'    => (int)$p['quantity'],
+        ], $prizes);
+
+        return $row;
     }
 }
