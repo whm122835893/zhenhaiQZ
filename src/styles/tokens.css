@@ -1,0 +1,153 @@
+/* ============================================================
+   臻海艺术 H5 — 全局设计令牌
+   数值来源：h5.shengtai.cyou 生产环境实测 getComputedStyle
+   基准：390px 视口宽（等价原站 750rpx 设计稿）
+   ============================================================ */
+:root {
+  /* ---------- 主色 / 品牌 ---------- */
+  --color-primary: #4a8ff7;          /* 主蓝 - tabbar 选中、主按钮 */
+  --color-primary-light: #56a3fc;    /* 浅蓝 - 登录按钮箭头胶囊 */
+  --color-primary-grad: linear-gradient(180deg, #6fb0ff 0%, #3d7ff0 100%);
+  --color-primary-deep: #2f6fe0;
+
+  /* ---------- 文字 ---------- */
+  --color-text-title: #0e1838;       /* 主标题深蓝黑 rgb(14,24,56) */
+  --color-text-main: #0d0f38;        /* 强调标题 rgb(13,15,56) */
+  --color-text-body: #333333;        /* 正文 */
+  --color-text-body-2: #4c4d51;      /* 次级正文 */
+  --color-text-secondary: #666666;   /* 辅助文字 */
+  --color-text-muted: #7e8b9b;       /* 弱化 rgb(126,139,155) */
+  --color-text-muted-2: #4c5370;     /* 深灰蓝 rgb(76,83,112) */
+  --color-text-disabled: #c0c4cc;    /* 占位/禁用 rgb(192,196,204) */
+  --color-text-white: #ffffff;
+  --color-text-inverse: rgba(128, 128, 143, 0.7);
+
+  /* ---------- 背景 ---------- */
+  --color-bg-page: #f5f7fa;          /* 页面底色（浅蓝灰） */
+  --color-bg-card: #ffffff;
+  --color-bg-fill: #f7f8fa;          /* 输入框/占位底 */
+  --color-bg-fill-blue: #e8eef7;     /* 蓝调填充 rgb(232,238,247) */
+  --color-bg-mask: rgba(0, 0, 0, 0.5);
+
+  /* ---------- 边框 / 分割 ---------- */
+  --color-border: #e8eaed;
+  --color-border-light: #f2f4f7;
+
+  /* ---------- 状态色 ---------- */
+  --color-success: #34c759;
+  --color-warning: #ff9f1c;
+  --color-danger: #ff4d4f;
+  --color-tag-green: #52c41a;
+  --color-tag-red: #f5222d;
+
+  /* ---------- 圆角 ---------- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* ---------- 间距（8pt 基准） ---------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ---------- 字号 ---------- */
+  --font-hero: 24.96px;     /* 首页主标题 */
+  --font-h1: 20.8px;
+  --font-h2: 16.64px;       /* 粗体标题 fw700 */
+  --font-h3: 15px;
+  /* 原站 body{font-size:16px}（uni.css 原文），此值会影响所有未显式声明
+     font-size 的容器的行高，进而影响布局高度，必须与原站一致。 */
+  --font-body: 16px;
+  --font-sm: 12.48px;
+  --font-xs: 11.44px;
+  --font-xxs: 10.92px;
+  --font-mini: 9.88px;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  /* ---------- 阴影 ---------- */
+  --shadow-card: 0 2px 12px rgba(14, 24, 56, 0.06);
+  --shadow-float: 0 6px 20px rgba(14, 24, 56, 0.12);
+  --shadow-tabbar: 0 -2px 16px rgba(14, 24, 56, 0.06);
+
+  /* ---------- 层级 ---------- */
+  --z-tabbar: 100;
+  --z-navbar: 200;
+  --z-popup: 900;
+  --z-mask: 999;
+
+  /* ---------- 固定尺寸 ---------- */
+  --nav-bar-height: 44px;
+  --tab-bar-height: 50px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* 原站 uni-app 注入的状态栏/窗口变量，H5 端均为 0；
+     未定义会让 calc(var(--status-bar-height) + x) 整条声明失效，必须显式声明 */
+  --status-bar-height: 0px;
+  --window-top: 0px;
+  --window-bottom: 0px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+/*
+  原站 uni-app 的 rem 基准：750rpx 设计稿 → 1rem = 100vw / 23.4375
+  在 390px 视口下 1rem = 16.64px（与原站 getComputedStyle 实测一致）
+  页面 CSS 直接沿用原站 rem 数值，即可保证像素级一致
+*/
+html { font-size: calc(100vw / 23.4375); }
+html, body, #app { width: 100%; height: 100%; }
+/* 原站全站没有声明 font-family（实测 computed 为浏览器默认 "Times New Roman"，
+   中文走系统 fallback），因此这里必须保持浏览器默认字体，不得设置字体栈，
+   否则数字字宽会与原站不一致（例如 11 位手机号：原站 80px、系统字体 89px）。
+   Vant 会注入 html{font-family:var(--van-base-font)}，需一并纠正。 */
+html, body, #app {
+  font-family: initial;
+}
+body {
+  font-size: var(--font-body);
+  color: var(--color-text-body);
+  background: var(--color-bg-page);
+  overflow-x: hidden;
+}
+img { display: block; border: 0; }
+/* 原站 uni-app 把 <view>/<text> 编译为块级自定义元素（uni-view/uni-text），
+   本地沿用同名 <view>/<text> 标签，必须补齐 display，否则会退回 inline
+   导致 margin 不生效、宽度塌陷、盒模型整体偏移。
+
+   注意：此处绝不可写成 `view, text, *` 之类的通配，也不要覆盖 van-* 组件标签。
+   Vant 组件（van-popup / van-dialog 等）依赖内联 display:none 与 position:fixed
+   控制显隐，一旦被全局 display:block 强制覆盖，隐藏弹窗会全部常驻可见
+   （表现为「页面下滑露出其他页面」）。 */
+view, text, image, scroll-view, swiper, swiper-item { display: block; }
+a { text-decoration: none; color: inherit; }
+button { border: 0; background: none; font-size: inherit; color: inherit; cursor: pointer; }
+ul, li { list-style: none; }
+input, textarea { border: 0; outline: none; background: none; font-family: inherit; }
+/* ============================================================
+   uni-app 布局工具类
+   原站（uv-ui / uni-app 框架）内置以下原子类，本项目多处模板沿用同名类名，
+   但此前未定义，导致 display 退回 block —— flex 行变成竖排（表现为
+   活动记录页 5 个 tab 竖着堆叠、每个撑满 319px）。此处按原站语义补齐。
+   ============================================================ */
+.centerBetween { display: flex; justify-content: space-between; align-items: center; }
+.center        { display: flex; justify-content: center; align-items: center; }
+.flex-center   { display: flex; justify-content: center; align-items: center; }
+.endBetween    { display: flex; justify-content: space-between; align-items: flex-end; }
+.doubleCenter  { display: flex; justify-content: center; align-items: center; }
+.columnCenter  { display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.columnDoubleCenter { display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.absoluteCenter { position: absolute; display: flex; justify-content: center; align-items: center; }
+.flex-centerBetween { display: flex; justify-content: space-between; align-items: center; }
+.wrap { display: flex; flex-wrap: wrap; }
+.centerWrap { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; }

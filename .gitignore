@@ -1,0 +1,37 @@
+# ---------- 依赖 ----------
+node_modules/
+server/shengtai-api/vendor/
+
+# ---------- 构建产物 ----------
+dist/
+server/shengtai-api/runtime/
+
+# ---------- 密钥与环境变量（绝不入库） ----------
+# 含 JWT_SECRET / DB_PASS / RSA_PRIVATE_KEY
+.env
+.env.local
+.env.*.local
+server/shengtai-api/.env
+
+# ---------- 比对过程的临时产物 ----------
+# 根目录散落的对比截图（*-mine.png / *-orig.png / *-compare.png 等）
+# 是逐页像素比对时的中间产物，可由 scripts/ 重新生成，不入库
+/*.png
+/*.jpg
+/e2e-shots/
+/screenshots/
+/.preview/
+
+# 早期交付的单文件预览（10 月中旬的阶段性产物，共 30MB），
+# 已由 vite build 产出的 dist/ 取代，可由 npm run build 重新生成
+/臻海艺术*.html
+/preview.html
+
+# 云开发工具的本地配置
+.cloudstudio
+
+# ---------- 日志与缓存 ----------
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

@@ -1,0 +1,55 @@
+/* 原站 uv-ui 图标字体（/assets/uvicons-DzZuDpaw.ttf），family 名与原站一致 */
+@font-face {
+  font-family: uvicon-iconfont;
+  src: url('../assets/uv-iconfont.ttf') format('truetype');
+}
+
+/* 原站公告详情页字体（/assets/SourceHanSansCN-Regular-DDvDncSQ.otf，family: MyFont2）
+   原文件 8.4MB，此处为子集化版本（常用字 + ASCII + 标点），family 名与原站保持一致。
+
+   注意：这条 @font-face 在原站只存在于「公告详情页」的 CSS 分包
+   （assets/css-info-CWmdEuW1.css），该分包不进其他页面。
+   所以 P0 市场交易页虽然写了 font-family: MyFont2，但那个 family 在那些页面上
+   **从未注册**，浏览器静默回退到默认字体 —— 这正是原站的真实渲染结果。
+   为 1:1 复现，这条 @font-face 已从全局移入 NoticeInfo.vue 的 scoped 样式，
+   只在公告详情页生效。P0 五页请保持 font-family: MyFont2 不加载任何字体。 */
+
+/* P0 市场交易页字体（原站分包内声明的 iconfont 风格 ttf，仅少量字形）
+   当前 P0 五页不引用此 family（与原站一致：MyFont2 未注册 → 回退默认字体），
+   保留此文件以备后续按需局部引用。 */
+@font-face {
+  font-family: MyFont2Iconfont;
+  src: url('../assets/market/market-font.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+/* 原站全局 iconfont（uni 编译产物 index-Tn_rExiI.css 内联 base64 ttf，family 名 iconfont）
+   账户体系 11 页的箭头/复制图标走这套字体，字形码已从原站 CSS 原文提取：
+     .icon-right:before { content: "\e61f" }
+     .icon-copy:before  { content: "\e77c" }
+   注意：.icon-check 在原站全站没有字形定义，勾选时只显示蓝圆点、无对勾 —— 复刻需照此保留。 */
+@font-face {
+  font-family: iconfont;
+  src: url('../assets/iconfont-base64.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+.iconfont {
+  font-family: iconfont !important;
+  font-size: 16px;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.icon-right::before {
+  content: '\e61f';
+}
+
+.icon-copy::before {
+  content: '\e77c';
+}

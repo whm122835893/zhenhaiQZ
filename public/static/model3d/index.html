@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="xEBpsOYq4cD04bMedKg5vc">
+<head data-page-node-id="0fbPnoZw023hdIn8naj7c8">
+  <meta charset="UTF-8" data-page-node-id="pRWdQujz272vKsZnapbuPA">
+  <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no" data-page-node-id="qFGwRKoQOrDGnoPAWiDtOZ">
+  <title>3D Viewer</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+    /* model-viewer 默认是 block，需显式给尺寸；高度百分比依赖 html/body 的 100% */
+    model-viewer { width: 100%; height: 100%; background-color: transparent; --poster-color: transparent; }
+
+    /* 隐藏 model-viewer 自带的加载进度条与蒙层。
+       默认样式是 shadow DOM 里的 #default-progress-bar > .bar：
+       top:0 / height:5px / rgba(0,0,0,0.4) —— 就是顶部那条 5px 灰条
+       （#999 在白底上正是 rgba(0,0,0,0.4) 混合出来的颜色）；
+       另外还有一层 .mask 铺满整个区域、20% 白色，加载时会让画面发灰。
+
+       这里做两重保险：
+       1. 主方案是 body 里的 <div slot="progress-bar">，用 model-viewer 官方的
+          slot 覆盖机制直接替换掉整块默认进度条（连带 .mask 一起没了）；
+       2. 下面这组 CSS 变量是补充，万一某些版本的 slot 覆盖不生效，
+          也能把条形高度压成 0、蒙层设为透明。
+       想保留进度条的话，删掉 body 里的 slot 元素，并把 height 改回 5px 即可。 */
+    model-viewer {
+      --progress-bar-height: 0px;
+      --progress-bar-color: transparent;
+      --progress-mask: transparent;
+    }
+    /* 第三重兜底：直接命中 shadow part，老版本没有 slot 覆盖时也管用 */
+    model-viewer::part(default-progress-bar),
+    model-viewer::part(default-progress-mask) { display: none; }
+    ::-webkit-scrollbar { display: none; }
+  </style>
+  <!-- model-viewer 是 ES Module，必须走 type="module"（自带 defer 语义） -->
+  <script type="module" src="./model-viewer.min.js"></script>
+</head>
+<body data-page-node-id="bOlAqlT7SyGiWhTGW5Bxc8">
+
+<model-viewer
+  id="mv"
+  alt="3D 模型"
+  camera-target="0m 0m 0m"
+  shadow-intensity="0"
+  interaction-prompt="none"
+  touch-action="pan-y"
+  style="width:100%;height:100%" data-page-node-id="uu19NH86YVxLwwvs7hR32u">
+
+  <!-- 官方 slot 覆盖：model-viewer 的进度条有同名 slot，
+       塞一个空元素进来就整块替换掉默认进度条（含加载蒙层），
+       比改 CSS 更彻底，也不受组件版本 / 变量名改动影响。
+       不要进度条就保持这里为空。 -->
+  <div slot="progress-bar"></div>
+</model-viewer>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ------------------------------------------------------------------ *
+   * 1. URL 参数解析
+   *    父页面（uni-app）通过 query string 把配置传进来
+   * ------------------------------------------------------------------ */
+  var P = (function () {
+    var r = {};
+    var search = location.search.slice(1);
+    if (!search) return r;
+    search.split('&').forEach(function (kv) {
+      if (!kv) return;
+      var i = kv.indexOf('=');
+      if (i < 0) { r[decodeURIComponent(kv)] = ''; return; }
+      r[decodeURIComponent(kv.slice(0, i))] = decodeURIComponent(kv.slice(i + 1));
+    });
+    return r;
+  })();
+
+  var mv = document.getElementById('mv');
+
+  /* ------------------------------------------------------------------ *
+   * 2. 与父页面通信（同源可直接 DOM 访问，但用 postMessage 更解耦）
+   * ------------------------------------------------------------------ */
+  function post(data) {
+    data.__nbModelViewer = true;
+    parent.postMessage(data, '*');
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 3. 初始化
+   *    module script 是 defer 的，必须等自定义元素注册完才能操作
+   * ------------------------------------------------------------------ */
+  var CONFIG = {
+    speed:  P.speed  || '200%',      // 转速，基准 Math.PI/32 rad/s 的倍数（200% = 32 秒/圈）
+    delay:  P.delay  || '500',       // 自动旋转启动延迟(ms)
+    orbit:  P.orbit  || '0deg 90deg 105%',  // 手动指定时的初始视角（也作为自动对正的兜底）
+    // 自动把初始视角对准「贴图所在的正面」，避免一进来看到背面/空白灰面。
+    // 传 autofront=0 关闭，改用 orbit 参数。
+    autoFront: P.autofront !== '0'
+  };
+
+  // 运行期状态：当前锁定的展示材质 & 实际生效的初始视角（供 reset 复用）
+  var active = { material: null, orbit: CONFIG.orbit };
+
+  function init() {
+    if (!P.modelurl) {
+      post({ type: 'error', message: '缺少 modelurl 参数' });
+      return;
+    }
+
+    // 自动旋转：布尔属性必须用 setAttribute('auto-rotate','')，不能用 ='true'
+    if (P.rot === '0') {
+      mv.removeAttribute('auto-rotate');
+    } else {
+      mv.setAttribute('auto-rotate', '');
+    }
+    mv.setAttribute('auto-rotate-delay', CONFIG.delay);
+    mv.setAttribute('rotation-per-second', CONFIG.speed);
+    mv.setAttribute('camera-orbit', CONFIG.orbit);
+
+    // touch=0 → 禁止用户手动拖动（与 NewBee 的 istouch 参数一致）
+    if (P.touch === '0') {
+      mv.removeAttribute('camera-controls');
+    } else {
+      mv.setAttribute('camera-controls', '');
+    }
+
+    if (P.bg) document.body.style.background = P.bg;
+
+    mv.setAttribute('src', P.modelurl); // 赋值 src 才开始真正加载
+  }
+
+  customElements.whenDefined('model-viewer').then(function () {
+    init();
+  });
+
+  // 运行时兜底：js 没加载到时给个明确报错，避免白屏无提示
+  setTimeout(function () {
+    if (!customElements.get('model-viewer')) {
+      post({ type: 'error', message: 'model-viewer.min.js 加载失败，检查该 js 是否与本 html 同级' });
+    }
+  }, 8000);
+
+  /* ------------------------------------------------------------------ *
+   * 4. 生命周期事件 → 通知父页面
+   * ------------------------------------------------------------------ */
+  mv.addEventListener('progress', function (e) {
+    post({ type: 'progress', value: e.detail.totalProgress });
+  });
+
+  mv.addEventListener('load', function () {
+    post({ type: 'loaded' });
+
+    // 锁定"用来显示藏品图"的那个材质
+    var mat = findDisplayMaterial(P.material);
+    active.material = mat;
+    if (mat) post({ type: 'material', name: mat.name });
+
+    var wantTexture = (P.applytexture === '1' || P.type === '0') && P.imgurl;
+
+    var chain = (wantTexture && mat) ? applyTextureTo(mat, P.imgurl) : Promise.resolve();
+
+    chain.then(function () {
+      // 贴图落位后再对正视角，保证第一帧看到的就是贴图面
+      if (CONFIG.autoFront) alignToFace(mat);
+    }).catch(function () { /* 错误已在各自内部上报 */ });
+  });
+
+  mv.addEventListener('error', function (e) {
+    post({ type: 'error', message: (e.detail && e.detail.message) || '模型加载失败' });
+  });
+
+  /* ------------------------------------------------------------------ *
+   * 5. 材质解析
+   *
+   *    模型的惯例是：一面是「空白的灰面」留给业务贴图，另一面自带平台
+   *    logo 贴图。所以要找的是"还没有 baseColorTexture 的那一面"，
+   *    绝不能盲取 materials[0]（那多半是带 logo 的背面）。
+   * ------------------------------------------------------------------ */
+  function hasBaseTexture(mat) {
+    try {
+      var t = mat.pbrMetallicRoughness && mat.pbrMetallicRoughness.baseColorTexture;
+      return !!(t && t.texture);
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function isDecorMaterial(name) {
+    // 边框 / 侧边条之类，不是可贴图的主面
+    return /边框|边条|border|frame|edge|side/i.test(name || '');
+  }
+
+  function findDisplayMaterial(name) {
+    if (!mv.model) return null;
+    var mats = mv.model.materials || [];
+    if (!mats.length) return null;
+
+    if (name) {
+      // 1) 精确匹配
+      for (var i = 0; i < mats.length; i++) {
+        if (mats[i].name === name) return mats[i];
+      }
+      // 2) 前缀匹配：three.js 遇到重名会补 .001/.002/.003 后缀
+      for (var j = 0; j < mats.length; j++) {
+        if (mats[j].name && mats[j].name.indexOf(name) === 0) return mats[j];
+      }
+      // 3) 包含匹配：导出命名带前后缀的情况
+      for (var k = 0; k < mats.length; k++) {
+        if (mats[k].name && mats[k].name.indexOf(name) >= 0) return mats[k];
+      }
+      // 4) 指定了名字但没找到 → 继续走下面的自动推断，并在控制台留痕
+      if (console && console.warn) {
+        console.warn('[nb-model-viewer] 未找到材质 "' + name + '"，可用：' +
+          mats.map(function (m) { return m.name; }).join(' / '));
+      }
+    }
+
+    // 5) 自动推断：优先选"还没有贴图、且不是边框"的材质
+    var fallback = null;
+    for (var m = 0; m < mats.length; m++) {
+      if (isDecorMaterial(mats[m].name)) continue;
+      if (!hasBaseTexture(mats[m])) { fallback = mats[m]; break; }
+    }
+    if (fallback) return fallback;
+
+    // 6) 实在没有空白面，退而求其次取非边框的第一个
+    for (var n = 0; n < mats.length; n++) {
+      if (!isDecorMaterial(mats[n].name)) return mats[n];
+    }
+    return mats[0];
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 6. 贴图替换：多个藏品复用同一个基础模型，只换表面贴图
+   * ------------------------------------------------------------------ */
+  function applyTextureTo(mat, url) {
+    if (!mat) {
+      post({ type: 'error', message: '未找到可用材质' });
+      return Promise.resolve();
+    }
+    return mv.createTexture(url).then(function (tex) {
+      mat.pbrMetallicRoughness.baseColorTexture.setTexture(tex);
+      mat.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1]);
+      post({ type: 'textured', material: mat.name });
+    }).catch(function (err) {
+      post({ type: 'error', message: '贴图失败: ' + err });
+    });
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 7. 自动对正视角
+   *
+   *    目的：不管模型是怎么导出的，第一帧都正对「贴图所在的那一面」。
+   *
+   *    难点：这块资产的三角面环绕方向、顶点法线都指向模型内部（不是
+   *    glTF 惯例的朝外），所以单看法线符号会摆到背面去。解决办法是
+   *    「法线定轴向、网格相对模型中心的位置定正负」：
+   *      - 主导法线 a（面积加权）给出面板法线所在的轴
+   *      - 面板中心 P 相对模型中心 C 的偏移，决定相机该站哪一侧
+   *    模型整体中心被 model-viewer 归一到原点，所以 C≈0。
+   * ------------------------------------------------------------------ */
+
+  // model-viewer 的 mv.model 只是材质包装类，拿不到网格；
+  // 真正的 three.js 场景挂在元素的一个 Symbol(私有) 属性上。
+  function getInternalScene() {
+    try {
+      var syms = Object.getOwnPropertySymbols(mv);
+      for (var i = 0; i < syms.length; i++) {
+        var v;
+        try { v = mv[syms[i]]; } catch (e) { continue; }
+        if (v && v.isScene && typeof v.traverse === 'function') return v;
+      }
+    } catch (e) { /* 取不到就跳过对正，不影响贴图 */ }
+    return null;
+  }
+
+  function collectMeshes(scene, mat) {
+    var list = [];
+    scene.traverse(function (o) {
+      if (!o.isMesh || !o.geometry) return;
+      var pos = o.geometry.attributes && o.geometry.attributes.position;
+      if (!pos || pos.count < 3) return;
+      o.__nbVerts = pos.count;
+      o.__nbIsTarget = !!(mat && o.material &&
+        (o.material === mat || o.material.name === mat.name));
+      list.push(o);
+    });
+    return list;
+  }
+
+  function meshWorldBox(mesh) {
+    var geo = mesh.geometry;
+    if (!geo.boundingBox && geo.computeBoundingBox) geo.computeBoundingBox();
+    var bb = geo.boundingBox;
+    if (!bb) return null;
+    mesh.updateWorldMatrix(true, false);
+    var e = mesh.matrixWorld.elements;
+    var lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    [[bb.min.x, bb.min.y, bb.min.z], [bb.max.x, bb.max.y, bb.max.z]].forEach(function (c) {
+      var wx = e[0] * c[0] + e[4] * c[1] + e[8]  * c[2] + e[12];
+      var wy = e[1] * c[0] + e[5] * c[1] + e[9]  * c[2] + e[13];
+      var wz = e[2] * c[0] + e[6] * c[1] + e[10] * c[2] + e[14];
+      lo = [Math.min(lo[0], wx), Math.min(lo[1], wy), Math.min(lo[2], wz)];
+      hi = [Math.max(hi[0], wx), Math.max(hi[1], wy), Math.max(hi[2], wz)];
+    });
+    return {
+      center: [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2],
+      size:   [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]]
+    };
+  }
+
+  // 面积加权的主导法线：取该网格"面积最大的那个朝向"
+  // （一块面板的正面面积远大于它的侧壁，所以能稳定挑出面板法线）
+  function dominantNormal(mesh) {
+    var geo = mesh.geometry;
+    var pos = geo.attributes.position;
+    var nrm = geo.attributes.normal;
+    var idx = geo.index;
+    var triCount = Math.floor((idx ? idx.count : pos.count) / 3);
+    if (!triCount) return null;
+
+    mesh.updateWorldMatrix(true, false);
+    var e = mesh.matrixWorld.elements;
+    function wPos(i) {
+      var x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      return [e[0] * x + e[4] * y + e[8]  * z + e[12],
+              e[1] * x + e[5] * y + e[9]  * z + e[13],
+              e[2] * x + e[6] * y + e[10] * z + e[14]];
+    }
+    function wNormal(i) {
+      var x = nrm.getX(i), y = nrm.getY(i), z = nrm.getZ(i);
+      var nx = e[0] * x + e[4] * y + e[8]  * z;
+      var ny = e[1] * x + e[5] * y + e[9]  * z;
+      var nz = e[2] * x + e[6] * y + e[10] * z;
+      var L = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+      return [nx / L, ny / L, nz / L];
+    }
+
+    var step = Math.max(1, Math.floor(triCount / 6000)); // 大网格抽样，避免卡顿
+    var buckets = {};
+    for (var t = 0; t < triCount; t += step) {
+      var ia, ib, ic;
+      if (idx) { ia = idx.getX(t * 3); ib = idx.getX(t * 3 + 1); ic = idx.getX(t * 3 + 2); }
+      else { ia = t * 3; ib = t * 3 + 1; ic = t * 3 + 2; }
+
+      var A = wPos(ia), B = wPos(ib), C = wPos(ic);
+      var ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2];
+      var vx = C[0] - A[0], vy = C[1] - A[1], vz = C[2] - A[2];
+      var cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+      var area = Math.sqrt(cx * cx + cy * cy + cz * cz) / 2;
+      if (!area || !isFinite(area)) continue;
+
+      var nx, ny, nz;
+      if (nrm) {
+        // 优先用作者写入的顶点法线
+        var n0 = wNormal(ia), n1 = wNormal(ib), n2 = wNormal(ic);
+        nx = (n0[0] + n1[0] + n2[0]) / 3;
+        ny = (n0[1] + n1[1] + n2[1]) / 3;
+        nz = (n0[2] + n1[2] + n2[2]) / 3;
+      } else {
+        // 没有顶点法线就退回环绕方向算出的面法线
+        nx = cx; ny = cy; nz = cz;
+      }
+      var L2 = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (!L2) continue;
+      nx /= L2; ny /= L2; nz /= L2;
+
+      var key = Math.round(nx * 20) + '|' + Math.round(ny * 20) + '|' + Math.round(nz * 20);
+      if (!buckets[key]) buckets[key] = { area: 0, x: 0, y: 0, z: 0 };
+      buckets[key].area += area;
+      buckets[key].x += nx * area;
+      buckets[key].y += ny * area;
+      buckets[key].z += nz * area;
+    }
+
+    var best = null;
+    for (var k in buckets) {
+      if (!best || buckets[k].area > best.area) best = buckets[k];
+    }
+    if (!best) return null;
+    var bl = Math.sqrt(best.x * best.x + best.y * best.y + best.z * best.z) || 1;
+    return [best.x / bl, best.y / bl, best.z / bl];
+  }
+
+  function alignToFace(mat) {
+    if (!mat || !mv.model) return;
+
+    var scene = getInternalScene();
+    if (!scene) return;
+
+    var meshes = collectMeshes(scene, mat);
+
+    // 目标材质可能挂在多个网格上，取顶点数最多的那个（主面板）
+    var target = null;
+    for (var i = 0; i < meshes.length; i++) {
+      if (!meshes[i].__nbIsTarget) continue;
+      if (!target || meshes[i].__nbVerts > target.__nbVerts) target = meshes[i];
+    }
+    if (!target) return;
+
+    var axis = dominantNormal(target);
+    if (!axis) return;
+
+    // 模型整体包围盒（model-viewer 会把它归一到原点）
+    var lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (var m = 0; m < meshes.length; m++) {
+      var b = meshWorldBox(meshes[m]);
+      if (!b) continue;
+      for (var a = 0; a < 3; a++) {
+        lo[a] = Math.min(lo[a], b.center[a] - b.size[a] / 2);
+        hi[a] = Math.max(hi[a], b.center[a] + b.size[a] / 2);
+      }
+    }
+    var C = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
+    var span = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) || 1;
+
+    var tb = meshWorldBox(target);
+    if (!tb) return;
+    var d = [tb.center[0] - C[0], tb.center[1] - C[1], tb.center[2] - C[2]];
+    var dLen = Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+
+    var dir;
+    if (dLen > span * 0.001) {
+      // 主面板相对模型中心有偏移 → 相机站到面板那一侧
+      var proj = d[0] * axis[0] + d[1] * axis[1] + d[2] * axis[2];
+      if (Math.abs(proj) > span * 0.001) {
+        var sign = proj < 0 ? -1 : 1;
+        dir = [axis[0] * sign, axis[1] * sign, axis[2] * sign];
+      } else {
+        // 偏移方向与法线轴垂直（比如面板挂在支架上），直接朝面板中心看
+        dir = [d[0] / dLen, d[1] / dLen, d[2] / dLen];
+      }
+    } else {
+      // 单面板模型：中心重合，只能按法线本身的符号来
+      dir = axis;
+    }
+
+    var theta = Math.atan2(dir[0], dir[2]) * 180 / Math.PI;
+    var phi = Math.acos(Math.max(-1, Math.min(1, dir[1]))) * 180 / Math.PI;
+    if (Math.abs(theta) < 0.5) theta = 0;
+
+    var radius = CONFIG.orbit.split(/\s+/)[2] || '105%';
+    var orbit = round2(theta) + 'deg ' + round2(phi) + 'deg ' + radius;
+
+    active.orbit = orbit;
+    mv.setAttribute('camera-orbit', orbit);
+    mv.resetTurntableRotation(0);
+
+    post({
+      type: 'aligned', orbit: orbit, dir: [round2(dir[0]), round2(dir[1]), round2(dir[2])],
+      mesh: target.name || '', theta: round2(theta), phi: round2(phi)
+    });
+  }
+
+  function round2(n) {
+    return Math.round(n * 100) / 100;
+  }
+
+  function reapplyOrbit() {
+    if (CONFIG.autoFront && active.material) {
+      alignToFace(active.material);
+    } else {
+      mv.setAttribute('camera-orbit', active.orbit);
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 8. 接收父页面指令（可选能力）
+   * ------------------------------------------------------------------ */
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (!d || !d.__nbModelViewer) return;
+
+    switch (d.command) {
+      case 'pause':                       // 停止自转
+        mv.removeAttribute('auto-rotate');
+        break;
+      case 'resume':                      // 恢复自转
+        mv.setAttribute('auto-rotate', '');
+        break;
+      case 'setSpeed':                    // 动态改转速
+        mv.setAttribute('rotation-per-second', d.value);
+        break;
+      case 'applyTexture':                // 动态换贴图
+        applyTextureTo(d.material ? findDisplayMaterial(d.material) : active.material, d.url);
+        break;
+      case 'alignFront':                  // 手动触发一次视角对正
+        reapplyOrbit();
+        break;
+      case 'getState':                    // 查询当前状态
+        try {
+          var o = mv.getCameraOrbit();
+          post({
+            type: 'state',
+            yaw: mv.turntableRotation,
+            loaded: mv.loaded,
+            material: active.material ? active.material.name : null,
+            theta: o.theta, phi: o.phi, radius: o.radius
+          });
+        } catch (err) { /* ignore */ }
+        break;
+      case 'reset':                       // 视角归零
+        mv.resetTurntableRotation(0);
+        reapplyOrbit();
+        break;
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
