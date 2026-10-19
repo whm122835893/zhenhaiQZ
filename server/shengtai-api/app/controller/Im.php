@@ -214,4 +214,34 @@ class Im extends Base
             'joined' => false,
         ];
     }
+
+    /**
+     * GET /im/user/:uid —— 单个用户资料（源站 im 分包 getUser）
+     *
+     * 源站实测（pages-chat-web 分包）：
+     *   addMember(uid){ ... getUser(uid).then(s => s.status && s.data && (members[uid] = s.data)) }
+     *   getNickname(uid){ const m = this.members[uid]; return (m && m.nickname) || uid }
+     * 即前端只依赖 nickname，缺失时回落展示 uid 本身。
+     *
+     * 字段口径与 GET /im/group/user/:gid（群成员列表）保持一致，
+     * 避免同一用户在不同接口下昵称/头像字段名不一致。
+     */
+    public function user()
+    {
+        $uid = (string)($this->request->param('uid') ?? '');
+
+        if ($uid === '') {
+            throw ApiException::missing('uid');
+        }
+
+        $profile = UserProfile::where('uid', $uid)->find();
+        $arr = $profile ? $profile->toArray() : [];
+
+        return [
+            'uid'      => Transformer::id($uid),
+            'nickname' => (string)($arr['nickname'] ?? ''),
+            'avatar'   => (string)($arr['avatar'] ?? ''),
+            'avatarUrl'=> (string)($arr['avatar_url'] ?? ''),
+        ];
+    }
 }

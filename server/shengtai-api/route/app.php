@@ -151,6 +151,8 @@ Route::group(function () {
     Route::post('im/group/leave/:id', 'Im/leave');
     Route::get('im/group/message', 'Im/messages');
     Route::get('im/group/user/:gid', 'Im/members');
+    // 源站 im 分包 getUser：聊天页按 uid 拉昵称（前端只依赖 nickname）
+    Route::get('im/user/:uid', 'Im/user');
 
 })->middleware(\app\middleware\AuthMiddleware::class);
 

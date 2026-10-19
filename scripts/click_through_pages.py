@@ -134,10 +134,18 @@ def click_one(page, item: dict) -> str:
     tab 切换、图集轮播这类「文字不变但结构变了」的可交互行为；
     三者全无变化且无报错 → DEAD。
 
+    返回按钮单独处理：uni-app 的页面头返回键走 history.back()，
+    巡检为了强制重新加载先跳了 about:blank，点返回必然落到空白页 ——
+    那是正确行为，不能记成异常。
+
     注意：DEAD 绝大多数不是缺陷。选择器刻意放宽到 [class*='item'] /
     [class*='card']，命中的纯展示列表项本身没有点击 handler，点它当然没反应，
     这类元素计入 DEAD 是预期噪声，真正要盯的是 ERROR。
     """
+    # 返回/关闭类按钮：跳走是预期行为，不做健康检查
+    cls = (item.get("cls") or "").lower()
+    is_back_button = any(k in cls for k in ("back", "head-btn", "close", "nav-back"))
+
     before = _fingerprint(page)
 
     try:
@@ -150,12 +158,19 @@ def click_one(page, item: dict) -> str:
 
     page.wait_for_timeout(SETTLE_MS)
 
+    if is_back_button:
+        return "OK"
+
     errors = page.evaluate("() => window.__clickErrors || []")
     if errors:
         return "ERROR"
 
+    # 页面「空白」有两种可能：真的挂了，或点的是跳转按钮、正处于路由过渡态。
+    # 这里补等一轮再判定，避免把过渡态误报成异常。
     if not page_alive(page):
-        return "ERROR"
+        page.wait_for_timeout(1500)
+        if not page_alive(page):
+            return "ERROR"
 
     after = _fingerprint(page)
 
@@ -185,23 +200,45 @@ def _fingerprint(page) -> dict:
 
 def sweep_page(page, key: str, want_shots: bool, console_errors: list) -> dict:
     """对单页做点击巡检，返回该页统计。"""
-    url = FRONT + "/#" + key + QUERY_ARGS.get(key, "")
+    # QUERY_ARGS / dom_evidence 的键都是**不带**前导斜杠的（与 sweep_all_pages.py 同口径）
+    lookup = key.lstrip("/")
+    url = FRONT + "/#" + key + QUERY_ARGS.get(lookup, "")
     stat = {"page": key, "clicked": 0, "ok": 0, "dead": 0, "error": 0,
             "skipped": 0, "dangerous": [], "error_samples": []}
 
+    # 必须先 about:blank 断开文档，否则只改 hash 不会重新加载，
+    # 会复用上一页的 DOM，点击结果全部失真（sweep_all_pages.py 同款处理）。
+    page.goto("about:blank")
     page.goto(url, wait_until="domcontentloaded")
-    page.wait_for_timeout(1800)
+    # 等网络空闲再补一刀缓冲：内容型页面（如公告详情要拉相关藏品）
+    # 在固定短等待内往往还没渲染完，会被误判成「无可点元素」。
+    try:
+        page.wait_for_load_state("networkidle", timeout=6000)
+    except Exception:
+        pass  # 轮询型页面可能永不空闲，超时按当前状态继续
+    page.wait_for_timeout(1200)
 
-    # 页面本身没渲染出来就不用点它了，交给静态巡检报错
-    if not page_alive(page):
-        ev = dom_evidence(page, key)
-        if not ev:
-            stat["error_samples"].append("页面未渲染，无可点元素")
-            return stat
+    def _shot():
+        """无论是否提前返回都留一张截图，便于人工复核。"""
+        if want_shots:
+            os.makedirs(SHOT_DIR, exist_ok=True)
+            page.screenshot(path=f"{SHOT_DIR}/{key.replace('/', '_')}.png")
+
+    # 页面本身没渲染出来就不用点它了，交给静态巡检报错。
+    # 注意 chouqian 这类整页无文字、只有 CSS 底图的页面 page_alive 会误判为未渲染，
+    # 故回落到 dom_evidence 的结构证据（与 sweep_all_pages.py 同一口径）。
+    alive = page_alive(page)
+    if not alive:
+        alive = bool(dom_evidence(page, lookup))
+    if not alive:
+        stat["error_samples"].append("页面未渲染，无可点元素")
+        _shot()
+        return stat
 
     items = collect_clickables(page)
     if not items:
         stat["error_samples"].append("无可点元素")
+        _shot()
         return stat
 
     for item in items[:MAX_CLICKS_PER_PAGE]:
@@ -229,14 +266,15 @@ def sweep_page(page, key: str, want_shots: bool, console_errors: list) -> dict:
         # 注意 evaluate("() => ....length") 返回的是整数，不能再套 len()
         node_count = page.evaluate("() => document.querySelectorAll('#app *').length")
         if page.url.split("#")[0] != FRONT + "/" or node_count == 0:
+            page.goto("about:blank")
             page.goto(url, wait_until="domcontentloaded")
-            page.wait_for_timeout(1200)
+            try:
+                page.wait_for_load_state("networkidle", timeout=6000)
+            except Exception:
+                pass
+            page.wait_for_timeout(1000)
 
-    if want_shots:
-        os.makedirs(SHOT_DIR, exist_ok=True)
-        safe = key.replace("/", "_")
-        page.screenshot(path=f"{SHOT_DIR}/{safe}.png")
-
+    _shot()
     return stat
 
 
