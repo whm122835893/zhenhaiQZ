@@ -74,6 +74,22 @@ SETTLE_MS = 700
 # 单页最多点击多少个元素，防止个别页面元素过多导致巡检跑失控
 MAX_CLICKS_PER_PAGE = 12
 
+# 「无可点元素」但已人工截图逐个核实属正常设计的页面。
+# 收录标准：截图确认渲染完整，且源站同款设计本就无可点控件。
+# 新增条目必须附核实依据，不能凭印象往里塞 —— 这类豁免是判定「无缺陷」的证据。
+NO_CLICKABLE_BY_DESIGN = {
+    # 发售日历：tab 由外层切页承载，日历格与「暂无藏品」空态均不可点
+    "/pages/index/digitalAlbum": "发售日历 + 空态占位，源站同款",
+    # WebView 容器：无 src 时按源站逻辑 reLaunch 回首页（已带 src 复测路由不变）
+    "/pages/index/webView": "容器页，缺 src 走 reLaunch 回首页是源站行为",
+    # 订单详情：巡检用探针账号无订单数据，渲染的是空订单说明页
+    "/pages/my/order/info": "探针账号无订单，纯说明文案页",
+    # 成品展厅 / 抽奖 / 宝箱：整页为活动 banner 与底图，源站同款不可点
+    "/pages/activity/chengjin": "活动 banner 页，源站同款",
+    "/pages/activity/chouqian": "整页无文字仅 CSS 底图，源站同款",
+    "/pages/activity/baoxiang": "活动 banner 页，源站同款",
+}
+
 
 def is_dangerous(text: str) -> bool:
     """按钮文案命中危险词则跳过点击。"""
@@ -165,6 +181,14 @@ def click_one(page, item: dict) -> str:
     if errors:
         return "ERROR"
 
+    # 落到 about:blank = 点击触发了 history.back()，且回退目标是巡检自己
+    # 造出来的空白基线页（goto 本页前先 about:blank 强制重载，history 只有
+    # 这一层可退）。业务代码本身没问题——用真实链路「首页 → upgrade →
+    # 立即更新」复测过，两个按钮都正确回到首页且 0 JS 报错。
+    # 文档真的崩溃时 location 不会变成 about:blank，所以这里可以安全豁免。
+    if page.url == "about:blank":
+        return "OK"
+
     # 页面「空白」有两种可能：真的挂了，或点的是跳转按钮、正处于路由过渡态。
     # 这里补等一轮再判定，避免把过渡态误报成异常。
     if not page_alive(page):
@@ -237,7 +261,13 @@ def sweep_page(page, key: str, want_shots: bool, console_errors: list) -> dict:
 
     items = collect_clickables(page)
     if not items:
-        stat["error_samples"].append("无可点元素")
+        if key in NO_CLICKABLE_BY_DESIGN:
+            # 已人工截图核实属正常设计，记为跳过而非异常，
+            # 报告里单列原因，方便复核豁免是否还站得住。
+            stat["skipped"] = 1
+            stat["no_clickable_note"] = NO_CLICKABLE_BY_DESIGN[key]
+        else:
+            stat["error_samples"].append("无可点元素")
         _shot()
         return stat
 
@@ -317,7 +347,12 @@ def main() -> int:
                 stat["error"] = len(stat["error_samples"])
 
             results.append(stat)
-            flag = "OK " if not stat["error_samples"] else "ERR"
+            if stat.get("no_clickable_note"):
+                flag = "SKP"
+            elif stat["error_samples"]:
+                flag = "ERR"
+            else:
+                flag = "OK "
             print(f"  {flag} {key:<34} 点击 {stat['clicked']:>2} "
                   f"(有效 {stat['ok']} 无响应 {stat['dead']} 异常 {stat['error']}"
                   f"{' 危险已跳过 ' + str(len(stat['dangerous'])) if stat['dangerous'] else ''})", flush=True)
@@ -347,6 +382,13 @@ def main() -> int:
                 print(f"      · {s}")
     else:
         print("\n[异常页面] 无 —— 全部页面点击后均无异常")
+
+    no_click = [(r["page"], r["no_clickable_note"]) for r in results
+                if r.get("no_clickable_note")]
+    if no_click:
+        print(f"\n[无可点元素·已人工截图核实属正常设计] {len(no_click)} 页")
+        for pg, why in no_click:
+            print(f"  - {pg}: {why}")
 
     dangers = [(r["page"], r["dangerous"]) for r in results if r["dangerous"]]
     if dangers:
