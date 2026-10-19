@@ -35,3 +35,10 @@ server/shengtai-api/.env
 npm-debug.log*
 .DS_Store
 Thumbs.db
+
+# 源站 API 审计脚本的 chunk 缓存（96 个分包，可随时重新抓取）
+.cache/
+
+# Python 字节码缓存
+__pycache__/
+*.pyc
