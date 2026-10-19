@@ -39,6 +39,15 @@ Thumbs.db
 # 源站 API 审计脚本的 chunk 缓存（96 个分包，可随时重新抓取）
 .cache/
 
+# 例外：source-probe 是「源站原始响应存档」，必须入库。
+# 它是 verify_docs_against_source.py 通道 A（快照严格比对）的唯一基准，
+# 且被 docs/*.md 以「原始响应存档：.cache/source-probe/x.json」显式引用。
+# 不入库会导致 CI/他人机器上校验静默降级为实时比对，防复发机制形同虚设。
+!.cache/
+.cache/*
+!.cache/source-probe/
+!.cache/source-probe/
+
 # Python 字节码缓存
 __pycache__/
 *.pyc

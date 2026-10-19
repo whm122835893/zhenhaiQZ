@@ -18,7 +18,7 @@
 | 主键 | 统一 `id`，来源为源站雪花 ID（19 位，字符串形态 `2109928427009183745`） |
 | 审计字段 | 必含 `created_at`、`updated_at`，风格统一为 `datetime` |
 | 软删除 | 业务主表含 `is_deleted tinyint(1)` + `deleted_at datetime`（保留审计的流水表不加） |
-| 金额 | 一律 `decimal(20,2)`，单位**元**（源站接口返回的是「分」，转换在 DAO 层） |
+| 金额 | 一律 `decimal(20,2)`，**存「分」**（源站接口返回的就是分，本地不做换算，与源站保持 1:1） |
 | 枚举 | **禁 ENUM**，用 `varchar(32)` + 应用层常量类约束 |
 | 外键 | 逻辑外键 + 索引，不建物理 FK |
 | 索引 | 组合索引遵循「等值列在前，范围/排序列在后」 |
@@ -32,7 +32,7 @@
 |------|---------|---------|
 | 主键 | 19 位雪花 ID，如 `2109928427009183745`（超 `bigint` 安全 JS 范围） | `bigint unsigned` + API 层序列化为字符串 |
 | 时间 | 13 位毫秒**字符串**，如 `"1791959018537"` | `bigint` 存原始值 + `datetime` 冗余便于查询 |
-| 金额 | **同一响应内单位混用**：`price: 388` 是**元**，而 `secondaryHighPrice: 100000` / `todayTradeAmount` / `lastTradeAmount` 是**分**（实测同一藏品 iid=2109928427009183745：`price=388`、`secondaryHighPrice=500`(即5元)、`todayTradeAmount=827200`) | 一律存**元** `decimal(20,2)`，DAO 层对 `secondary*`/`*TradeAmount`/`lastTradeAmount` ÷100，`price` 原样。**切勿统一除 100** |
+| 金额 | **源站所有金额字段单位统一为「分」，不存在混用**。实测同一响应 `iid=2109928427009183745`：`price=388`、`secondaryHighPrice=500`、`todayTradeAmount=5649000`，前端对三者统一调用 `amountFormat(v)="￥"+Number(v/100).toFixed(2)` | 一律存**分** `decimal(20,2)`，DAO 层**原样返回不换算**（换算了就与源站不一致）。逐字段对照表见 `docs/api.md` 3.1.3 |
 | 图片 | `imageUrl`（CDN 绝对）+ `image`（相对路径）双字段 | 双字段并存，保持与源站响应结构 1:1 |
 | 脱敏 | `175****1293`、`王*绵`、`5202****9838` | 存原文，脱敏在响应层处理 |
 | 布尔 | `isPrimary`、`isSoldOut` 等 0/1 整数 | `tinyint(1)` |
@@ -238,7 +238,7 @@ secondaryLowPrice, secondaryHighPrice, boxOpenTime, isSoldOut, nftQuantity
 | image | varchar(255) | image | 图片相对路径 |
 | image_url | varchar(512) | imageUrl | 图片绝对地址 |
 | content | mediumtext | content | 图文详情（HTML） |
-| price | decimal(20,2) | price | 一级市场价格（元） |
+| price | decimal(20,2) | price | 一级市场价格（**分**，源站原样，前端 ÷100） |
 | type | varchar(32) | type | 藏品类型 |
 | issue_quantity | int | issueQuantity | 发行总量（实测 888888） |
 | buy_quantity | int | buyQuantity | 已购数量 |
@@ -985,7 +985,7 @@ price, payLock, payWay, chainId, chainCompleted, buyPrice, item{...}
 | # | 问题 | 现象 | 修正 |
 |---|------|------|------|
 | 1 | **缺公告-藏品关联表** | 源站 `GET /basic/notice` 每条公告带 `items` 数组（最多 3 条），原设计无处安放 | 新增 `notice_item_relations` 表 |
-| 2 | **金额单位在同一响应内混用** | 同一藏品 `price=388`（元）与 `secondaryHighPrice=500`（分，即 5 元）并存 | 一律存元，DAO 层对 `secondary*`/`*TradeAmount`/`lastTradeAmount` ÷100，`price` 原样 |
+| 2 | ~~**金额单位在同一响应内混用**~~ **该结论已撤销（2026-10-19 OPEN-01）** | 曾误判"`price=388`是元、`secondaryHighPrice=500`是分"，据此设计了 DAO 层选择性÷100 | **实测证明源站金额字段单位全部为「分」，无混用**。DAO 层改为原样返回不换算，`Transformer::amount()` 注释同步修正 |
 | 3 | **7 个统计字段实际可为空** | 源站返回 `priceChange`/`minPrice`/`tradeAmount`/`hourTradeQuantity`/`todayTradeMax(Min)Amount`/`lastTradeAmount` **恒为 null**，原定义 `NOT NULL` 导致插入失败 | 7 个字段改为 `NULL DEFAULT NULL` |
 | 4 | **`nfts.pay_way` 实际可为空** | 源站 `GET /nft/{nftId}` 返回 `payWay: null`，原定义 `NOT NULL DEFAULT 0` 报错 | 改为 `tinyint(1) NULL DEFAULT NULL` |
 

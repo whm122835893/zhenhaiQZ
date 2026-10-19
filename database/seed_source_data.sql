@@ -36,8 +36,11 @@ INSERT INTO `item_authors` (`id`, `name`, `avatar`, `avatar_url`, `introduction`
    '有着丰富的独立艺术品创作经验。', 1, 0);
 
 -- ---------- 藏品（源站 GET /nft/secondary + GET /item/{iid}）----------
--- 注意：源站 secondaryLowPrice/HighPrice、lastTradeAmount、todayTradeAmount 单位为【分】
---       price(388) 单位为【元】，两者在同一响应内并存，切勿统一除 100
+-- 实测时间：2026-10-19，抓取端点：GET /item/2109928427009183745
+-- 【重要】源站**所有**金额字段单位统一为【分】，不存在混用。
+--        price=388 即 3.88 元，secondaryHighPrice=500 即 5.00 元，
+--        本地一律原样存分，DAO 层不换算，前端÷100。
+--        旧注释曾误称"price 单位为元、切勿统一除 100"，该结论已撤销（OPEN-01）。
 INSERT INTO `items` (
   `id`, `iid`, `cid`, `author_id`, `name`, `contract`, `image`, `image_url`, `content`,
   `price`, `type`, `issue_quantity`, `buy_quantity`, `nft_quantity`,

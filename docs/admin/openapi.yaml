@@ -1,0 +1,1121 @@
+openapi: 3.0.3
+info:
+  title: 臻海艺术 · 运营后台管理 API
+  version: 1.0.0
+  description: |
+    运营后台专用 API，独立 ThinkPHP 进程监听 8922，独立路由表 route/admin.php。
+
+    约定（与 C 端保持一致的部分）：
+      - 路由自带 `/admin` 前缀，无 `/api` 中间层（admin-web 的 vite proxy 用
+        `/admin-api` → 8922 并 rewrite 掉 `^/admin-api`，实际路径即 `/admin/xxx`）
+      - 动态段风格 `:iid` / `:id`，冒号前缀，风格同 C 端 `/nft/secondary/:iid`
+      - 响应包络恒为 `{status, code, message, data}` 四字段
+      - HTTP 状态码一律 200，成败只看 `status`
+      - ID 一律为字符串；时间戳为 13 位毫秒数字符串
+      - 参数缺失时 message 形如 `iidmust not be null`（无空格，与 C 端逐字一致）
+
+    与 C 端不同的部分（后台自主契约）：
+      - 列表响应恒为 `{list, total, pageNo, pageSize}`，不用裸数组
+      - 金额字段统一以「元」为单位返回，字段名带 `Yuan` 后缀
+        （原因见下方「金额单位陷阱」）
+
+    认证：所有 /admin/auth/profile 之后的端点需 `Authorization: Bearer {token}`。
+servers:
+  - url: http://127.0.0.1:8922
+    description: 本地后台进程（生产建议独立子域名 + nginx 反代到 php-fpm）
+  - url: http://127.0.0.1:5174/admin-api
+    description: admin-web dev server 经 vite proxy 转发
+
+tags:
+  - name: auth
+    description: 后台认证与会话
+  - name: dashboard
+    description: 只读数据看板
+  - name: item
+    description: 商品与藏品管理（对应 C 端 items）
+  - name: copyright
+    description: 版权条目管理（对应 C 端 item_copyrights）
+  - name: author
+    description: 作者管理（对应 C 端 item_authors）
+  - name: nft
+    description: 二级市场监控（对应 C 端 nfts / nft_sell_orders / nft_trade_logs）
+  - name: user
+    description: 用户与实名审核（对应 C 端 users）
+  - name: system
+    description: 账号、角色、审计日志
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ==========================================================================
+  # 一、认证
+  # ==========================================================================
+  /admin/auth/signin:
+    post:
+      tags: [auth]
+      summary: 后台登录
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, minLength: 3, maxLength: 64 }
+                password: { type: string, minLength: 8, maxLength: 64 }
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          token: { type: string, description: 'Access Token,有效期 2 小时' }
+                          expiresAt: { type: string, description: 'Access Token 过期时间(13位毫秒字符串)' }
+                          sessionExpireAt: { type: string, description: '会话绝对过期时间(13位毫秒字符串)' }
+                          admin: { $ref: '#/components/schemas/AdminProfile' }
+                          permissions: { type: array, items: { type: string } }
+        '400':
+          description: '| 11001 用户名或密码错误 | 11002 账号已停用 | 11003 被强制下线（会话失效） |'
+        '400.1':
+          description: '业务失败包络，code 见下方“后台扩展错误码”'
+
+  /admin/auth/signout:
+    post:
+      tags: [auth]
+      summary: 登出（会话立即失效）
+      responses:
+        '200':
+          description: 登出成功，会话 status 置 0，该 token 立即不可用
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+
+  /admin/auth/profile:
+    get:
+      tags: [auth]
+      summary: 当前登录管理员信息与权限码集合
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          admin: { $ref: '#/components/schemas/AdminProfile' }
+                          roles: { type: array, items: { $ref: '#/components/schemas/Role' } }
+                          permissions: { type: array, items: { type: string } }
+
+  /admin/auth/password:
+    put:
+      tags: [auth]
+      summary: 修改自己的密码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [oldPassword, newPassword]
+              properties:
+                oldPassword: { type: string, minLength: 8, maxLength: 64 }
+                newPassword: { type: string, minLength: 8, maxLength: 64 }
+      responses:
+        '200':
+          description: 修改成功；密码变更会吊销该账号全部活跃会话（强制重登）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400':
+          description: '| 11004 原密码错误 |'
+
+  # ==========================================================================
+  # 二、只读看板
+  # ==========================================================================
+  /admin/dashboard/overview:
+    get:
+      tags: [dashboard]
+      summary: 核心指标概览
+      parameters:
+        - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          userTotal: { type: integer, description: 'users 表总数（不含软删）' }
+                          userRealNamed: { type: integer, description: 'has_real_name=1 的用户数' }
+                          itemTotal: { type: integer }
+                          itemOnSale: { type: integer }
+                          nftTotal: { type: integer }
+                          sellOrderActive: { type: integer, description: 'nft_sell_orders status=1' }
+                          tradeCount30d: { type: integer, description: '近 30 天 nft_trade_logs 条数' }
+                          tradeAmount30dYuan: { type: string, description: '近 30 天成交额（元,字符串）' }
+                          orderCount30d: { type: integer }
+
+  /admin/dashboard/trend:
+    get:
+      tags: [dashboard]
+      summary: 趋势数据（成交额 / 用户增长）
+      parameters:
+        - name: days
+          in: query
+          schema: { type: integer, default: 30, minimum: 7, maximum: 90 }
+        - name: dimension
+          in: query
+          schema: { type: string, enum: [trade, user, order], default: trade }
+      responses:
+        '200':
+          description: 按天聚合的时间序列
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          dimension: { type: string }
+                          points:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                date: { type: string, example: '2026-07-19' }
+                                count: { type: integer }
+                                amountYuan: { type: string }
+
+  /admin/dashboard/rank:
+    get:
+      tags: [dashboard]
+      summary: 藏品成交排行
+      parameters:
+        - { name: dimension, in: query, schema: { type: string, enum: [amount, count], default: amount } }
+        - { name: limit, in: query, schema: { type: integer, default: 10, maximum: 50 } }
+        - { name: days, in: query, schema: { type: integer, default: 30 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                iid: { type: string }
+                                name: { type: string }
+                                tradeCount: { type: integer }
+                                tradeAmountYuan: { type: string }
+
+  # ==========================================================================
+  # 三、藏品管理
+  # ==========================================================================
+  /admin/item:
+    get:
+      tags: [item]
+      summary: 藏品列表（返回基础值 + 后台覆盖标记）
+      parameters:
+        - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: keyword, in: query, schema: { type: string, description: '按藏品名模糊匹配' } }
+        - { name: status, in: query, schema: { type: string, enum: [on, off, sold_out] } }
+        - { name: cid, in: query, schema: { type: string, description: '分类ID' } }
+        - { name: authorId, in: query, schema: { type: string } }
+        - { name: onlyOverridden, in: query, schema: { type: boolean, default: false, description: '只看有后台覆盖的' } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PageList' }
+
+  /admin/item/:iid:
+    get:
+      tags: [item]
+      summary: 藏品详情
+      parameters:
+        - $ref: '#/components/parameters/Iid'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ItemDetail' }
+        '400':
+          description: '| 10203 未找到 |'
+
+  /admin/item/:iid/override:
+    put:
+      tags: [item]
+      summary: 写入藏品字段覆盖值（后台唯一写入口）
+      description: |
+        **隔离机制**：本端点只写 `admin_item_overrides`，**永不 UPDATE items 表**。
+        C 端 93 个端点的数据来源不变，因此 C 端展示不受影响。
+
+        幂等：同一 `(target_id, field_key)` 重复提交走 `ON DUPLICATE KEY UPDATE`，
+        不会产生第二条记录。清除某字段覆盖时提交 `fieldValue: null`，
+        服务端执行 DELETE 而非写入空值。
+      parameters:
+        - $ref: '#/components/parameters/Iid'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fieldKey, fieldValue]
+              properties:
+                fieldKey:
+                  type: string
+                  enum: [status, is_recommend, is_popular, price, is_secondary, is_secondary_batch]
+                fieldValue:
+                  nullable: true
+                  description: 'null 表示清除该字段的覆盖，恢复源站值'
+                remark: { type: string, maxLength: 512 }
+      responses:
+        '200':
+          description: 写入成功；每次写入产生一条 admin_operation_logs
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400':
+          description: '| 14003 无权限(item:write) | 11001 fieldValue 非法 | 14009 并发冲突 | 10203 藏品不存在 |'
+
+  /admin/item/:iid/overrides:
+    delete:
+      tags: [item]
+      summary: 批量清除某藏品的全部覆盖
+      parameters:
+        - $ref: '#/components/parameters/Iid'
+      responses:
+        '200':
+          description: 清除成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400':
+          description: '| 14003 无权限(item:write) |'
+
+  /admin/item/:iid/audit:
+    get:
+      tags: [item]
+      summary: 该藏品的覆盖变更历史
+      parameters:
+        - $ref: '#/components/parameters/Iid'
+        - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PageList' }
+
+  # ==========================================================================
+  # 四、版权管理
+  # ==========================================================================
+  /admin/copyright:
+    get:
+      tags: [copyright]
+      summary: 版权条目列表
+      parameters:
+        - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: keyword, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PageList' }
+
+  /admin/copyright/:id:
+    get:
+      tags: [copyright]
+      summary: 版权条目详情
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { type: object, properties: { id: { type: string }, name: { type: string }, image: { type: string }, imageUrl: { type: string }, sort: { type: integer }, overridden: { type: boolean } } }
+
+  /admin/copyright/:id/override:
+    put:
+      tags: [copyright]
+      summary: 写入版权条目覆盖值
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fieldKey, fieldValue]
+              properties:
+                fieldKey: { type: string, enum: [name, image, image_url, sort] }
+                fieldValue: { nullable: true }
+                remark: { type: string, maxLength: 512 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400':
+          description: '| 14003 无权限(copyright:write) | 10203 未找到 |'
+
+  # ==========================================================================
+  # 五、作者管理
+  # ==========================================================================
+  /admin/author:
+    get:
+      tags: [author]
+      summary: 作者列表
+      parameters:
+        - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: keyword, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PageList' }
+
+  /admin/author/:id:
+    get:
+      tags: [author]
+      summary: 作者详情（含其名下藏品列表）
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: string }
+                          name: { type: string }
+                          avatar: { type: string }
+                          avatarUrl: { type: string }
+                          introduction: { type: string }
+                          worksCount: { type: integer }
+                          followerCount: { type: integer }
+                          overriddenFields: { type: array, items: { type: string } }
+                          items: { type: array, items: { $ref: '#/components/schemas/ItemBrief' } }
+
+  /admin/author/:id/override:
+    put:
+      tags: [author]
+      summary: 写入作者覆盖值
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fieldKey, fieldValue]
+              properties:
+                fieldKey: { type: string, enum: [name, avatar, avatar_url, introduction] }
+                fieldValue: { nullable: true }
+                remark: { type: string, maxLength: 512 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400':
+          description: '| 14003 无权限(author:write) |'
+
+  # ==========================================================================
+  # 六、二级市场监控
+  # ==========================================================================
+  /admin/nft/sellOrder:
+    get:
+      tags: [nft]
+      summary: 挂单列表
+      parameters:
+        - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: status, in: query, schema: { type: integer, enum: [0, 1, 2], description: '0=已下架 1=在售 2=已售' } }
+        - { name: marketType, in: query, schema: { type: integer, enum: [1, 2, 3], description: '1=寄售 2=求购 3=委托' } }
+        - { name: iid, in: query, schema: { type: string } }
+        - { name: uid, in: query, schema: { type: string } }
+        - { name: onlyFlagged, in: query, schema: { type: boolean, default: false, description: '只看被后台标记的' } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PageList' }
+
+  /admin/nft/sellOrder/:id/override:
+    put:
+      tags: [nft]
+      summary: 写入挂单干预标记
+      description: |
+        只写 `admin_sell_order_overrides.admin_status`，**不改** nft_sell_orders.status。
+        后台「标记异常」与 C 端用户「自行下架」是两件事，不可混同。
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fieldValue]
+              properties:
+                fieldKey: { type: string, enum: [admin_status], default: admin_status }
+                fieldValue: { type: string, enum: [normal, flagged, blocked] }
+                remark: { type: string, maxLength: 512, description: 'flagged/blocked 时必填' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400':
+          description: '| 14003 无权限(nft:write) | 11001 remark 未填 |'
+
+  /admin/nft/tradeLog:
+    get:
+      tags: [nft]
+      summary: 成交记录
+      parameters:
+        - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: iid, in: query, schema: { type: string } }
+        - { name: nftId, in: query, schema: { type: string } }
+        - { name: startTime, in: query, schema: { type: string, description: '13位毫秒字符串' } }
+        - { name: endTime, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PageList' }
+
+  /admin/nft/asset:
+    get:
+      tags: [nft]
+      summary: NFT 资产列表
+      parameters:
+        - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: uid, in: query, schema: { type: string } }
+        - { name: iid, in: query, schema: { type: string } }
+        - { name: sellStatus, in: query, schema: { type: string, enum: [none, on_sale, sold] } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PageList' }
+
+  # ==========================================================================
+  # 七、用户与实名审核
+  # ==========================================================================
+  /admin/user:
+    get:
+      tags: [user]
+      summary: 用户列表
+      parameters:
+        - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: keyword, in: query, schema: { type: string, description: '手机号/昵称模糊匹配' } }
+        - { name: status, in: query, schema: { type: string, enum: [normal, frozen, banned] } }
+        - { name: hasRealName, in: query, schema: { type: integer, enum: [0, 1] } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PageList' }
+
+  /admin/user/:id:
+    get:
+      tags: [user]
+      summary: 用户详情（含钱包与藏品持有）
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: string }
+                          phone: { type: string }
+                          nickname: { type: string }
+                          avatar: { type: string }
+                          status: { type: string }
+                          hasRealName: { type: boolean }
+                          realName: { type: string, description: '受 hasRealName 控制；未实名返回空串' }
+                          createdAt: { type: string }
+                          wallet:
+                            type: object
+                            properties:
+                              balanceYuan: { type: string }
+                              frozenYuan: { type: string }
+                              totalIncomeYuan: { type: string }
+                              totalExpenseYuan: { type: string }
+                          nftCount: { type: integer }
+                          orderCount: { type: integer }
+
+  /admin/user/:id/status:
+    put:
+      tags: [user]
+      summary: 冻结 / 解冻用户
+      description: |
+        直接写 `users.status`（normal/frozen/banned）。这三个值是 C 端自己定义的
+        状态字段，C 端登录流程会读，属于「运营行使 C 端既有业务能力」，
+        因此**不建覆盖表**（见 ADR-007）。
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status, reason]
+              properties:
+                status: { type: string, enum: [normal, frozen, banned] }
+                reason: { type: string, minLength: 1, maxLength: 512, description: '原因必填，进审计日志' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400':
+          description: '| 14003 无权限(user:write) |'
+
+  /admin/user/realName/audit:
+    get:
+      tags: [user]
+      summary: 实名审核列表
+      parameters:
+        - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: hasRealName, in: query, schema: { type: integer, enum: [0, 1], default: 0 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PageList' }
+
+  /admin/user/:id/realName:
+    put:
+      tags: [user]
+      summary: 实名审核裁决
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, reason]
+              properties:
+                decision: { type: string, enum: [approve, reject] }
+                reason: { type: string, minLength: 1, maxLength: 512 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400':
+          description: '| 14003 无权限(user:audit) | 11001 驳回必须填原因 |'
+
+  # ==========================================================================
+  # 八、系统管理
+  # ==========================================================================
+  /admin/system/admin:
+    get:
+      tags: [system]
+      summary: 后台账号列表
+      parameters:
+        - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: keyword, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: integer, enum: [0, 1] } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PageList' }
+
+  /admin/system/admin:
+    post:
+      tags: [system]
+      summary: 新建后台账号
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password, roleIds]
+              properties:
+                username: { type: string, minLength: 3, maxLength: 64 }
+                password: { type: string, minLength: 8, maxLength: 64 }
+                realName: { type: string, maxLength: 64 }
+                phone: { type: string, maxLength: 20 }
+                roleIds: { type: array, minItems: 1, items: { type: string } }
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400':
+          description: '| 11002 用户名已存在 | 14003 无权限(admin:write) |'
+
+  /admin/system/admin/:id:
+    put:
+      tags: [system]
+      summary: 修改后台账号（角色分配 / 启停 / 基本信息）
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                realName: { type: string, maxLength: 64 }
+                phone: { type: string, maxLength: 20 }
+                status: { type: integer, enum: [0, 1] }
+                roleIds: { type: array, items: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400':
+          description: '| 11003 不能修改自己的角色 | 11004 不能停用最后一名超级管理员 | 14003 无权限(admin:write) |'
+
+  /admin/system/admin/:id/password:
+    put:
+      tags: [system]
+      summary: 重置他人密码
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newPassword]
+              properties:
+                newPassword: { type: string, minLength: 8, maxLength: 64 }
+      responses:
+        '200':
+          description: 重置成功；该账号所有会话被吊销，且下次登录强制改密
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400':
+          description: '| 14003 无权限(admin:write) |'
+
+  /admin/system/admin/:id:
+    delete:
+      tags: [system]
+      summary: 删除后台账号（软删除）
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: OK（软删除 + 吊销全部会话）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400':
+          description: '| 11003 不能删除自己 | 11004 不能删除最后一名超级管理员 | 14003 无权限(admin:write) |'
+
+  /admin/system/role:
+    get:
+      tags: [system]
+      summary: 角色列表（含已授权限码）
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list: { type: array, items: { $ref: '#/components/schemas/Role' } }
+
+  /admin/system/role/:id:
+    put:
+      tags: [system]
+      summary: 分配角色权限
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permissionCodes]
+              properties:
+                permissionCodes:
+                  type: array
+                  description: 全量覆盖式提交（非增量），服务端做差集比对
+                remark: { type: string, maxLength: 512 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400':
+          description: '| 14003 无权限(role:write) | 11005 权限码不存在 |'
+
+  /admin/system/permission:
+    get:
+      tags: [system]
+      summary: 权限点字典（供角色分配界面渲染）
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          groups:
+                            type: array
+                            description: '按 domain 分组'
+                            items:
+                              type: object
+                              properties:
+                                domain: { type: string }
+                                domainName: { type: string }
+                                permissions:
+                                  type: array
+                                  items: { $ref: '#/components/schemas/Permission' }
+
+  /admin/system/operationLog:
+    get:
+      tags: [system]
+      summary: 操作审计日志
+      parameters:
+        - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: adminId, in: query, schema: { type: string } }
+        - { name: module, in: query, schema: { type: string } }
+        - { name: action, in: query, schema: { type: string } }
+        - { name: targetId, in: query, schema: { type: string } }
+        - { name: isSuccess, in: query, schema: { type: integer, enum: [0, 1] } }
+        - { name: startTime, in: query, schema: { type: string, description: '13位毫秒字符串' } }
+        - { name: endTime, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageList'
+                          - type: object
+                            properties:
+                              list:
+                                type: array
+                                items: { $ref: '#/components/schemas/OperationLog' }
+
+  # ==========================================================================
+  # 兜底
+  # ==========================================================================
+  # 未匹配任何后台路由 → 返回 code 10203 / message「未找到」，与 C 端一致
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Iid:
+      name: iid
+      in: path
+      required: true
+      description: 藏品ID（雪花ID，字符串）
+      schema: { type: string, pattern: '^\d+$' }
+    Id:
+      name: id
+      in: path
+      required: true
+      description: 资源ID（雪花ID，字符串）
+      schema: { type: string, pattern: '^\d+$' }
+
+  schemas:
+    Envelope:
+      type: object
+      required: [status, code, message, data]
+      properties:
+        status: { type: boolean, description: '成败判定，固定读这个，不用 HTTP 状态码' }
+        code: { type: integer, description: '业务码，见“后台扩展错误码”' }
+        message: { type: string, nullable: true }
+        data: { nullable: true }
+
+    PageList:
+      type: object
+      description: '后台列表响应恒为此形态，不用裸数组'
+      required: [list, total, pageNo, pageSize]
+      properties:
+        list: { type: array, items: { type: object } }
+        total: { type: integer }
+        pageNo: { type: integer }
+        pageSize: { type: integer }
+
+    AdminProfile:
+      type: object
+      properties:
+        id: { type: string }
+        username: { type: string }
+        realName: { type: string }
+        isSuper: { type: boolean }
+        status: { type: integer, enum: [0, 1] }
+        lastLoginAt: { type: string, nullable: true }
+        pwdResetRequired: { type: boolean }
+
+    Role:
+      type: object
+      properties:
+        id: { type: string }
+        code: { type: string }
+        name: { type: string }
+        description: { type: string }
+        isBuiltin: { type: boolean }
+        permissions: { type: array, items: { type: string } }
+
+    Permission:
+      type: object
+      properties:
+        code: { type: string }
+        name: { type: string }
+        domain: { type: string }
+        action: { type: string }
+
+    ItemBrief:
+      type: object
+      properties:
+        iid: { type: string }
+        name: { type: string }
+        imageUrl: { type: string }
+        priceYuan: { type: string }
+
+    ItemDetail:
+      type: object
+      description: |
+        注意 overriddenFields 的存在意义：它明确告诉前端哪些字段的值来自后台覆盖，
+        哪些来自源站，避免运营把覆盖值误认为真实源站数据。
+      properties:
+        iid: { type: string }
+        cid: { type: string }
+        name: { type: string }
+        image: { type: string }
+        imageUrl: { type: string }
+        authorId: { type: string }
+        authorName: { type: string }
+        type: { type: string }
+        priceYuan: { type: string }
+        status: { type: string, enum: [on, off, sold_out] }
+        isRecommend: { type: boolean }
+        isPopular: { type: boolean }
+        isSecondary: { type: boolean }
+        issueQuantity: { type: integer }
+        buyQuantity: { type: integer }
+        nftQuantity: { type: integer }
+        tradeCount: { type: integer }
+        tradeAmountYuan: { type: string }
+        createdAt: { type: string }
+        overriddenFields: { type: array, items: { type: string } }
+
+    OperationLog:
+      type: object
+      properties:
+        id: { type: string }
+        adminId: { type: string }
+        adminUsername: { type: string }
+        module: { type: string }
+        action: { type: string }
+        method: { type: string }
+        path: { type: string }
+        targetType: { type: string }
+        targetId: { type: string }
+        isSuccess: { type: boolean }
+        errorCode: { type: integer }
+        errorMessage: { type: string }
+        ip: { type: string }
+        durationMs: { type: integer }
+        createdAt: { type: string }
+
+# ============================================================================
+# 错误码体系
+#
+# 复用 C 端 ApiException 既有 6 个常量（一字不改）：
+#   0      成功
+#   10100  参数缺失
+#   10101  参数类型错误
+#   10203  未找到
+#   11111  未登录 / 会话失效
+#   20000  系统错误
+#
+# 后台扩展（新增 6 个常量，仅后台使用，见 ADR-004）：
+#   11001  用户名或密码错误
+#   11002  账号已停用 / 用户名已存在（按场景区分 message）
+#   11003  目标对象不存在或禁止操作（不能改自己角色、不能删最后超管等）
+#   11004  原密码错误
+#   11005  权限码不存在
+#   11006  参数值非法（枚举越界、remark 未填等）
+#   14001  会话已被登出 / 被顶号（前端清 token 跳登录）
+#   14003  权限不足（前端 toast，不跳登录）
+#   14009  写冲突（乐观锁失败，前端提示刷新）
+#
+# 所有错误一律 HTTP 200 + 上述业务码，响应体恒为 Envelope 四字段。
+# ============================================================================
