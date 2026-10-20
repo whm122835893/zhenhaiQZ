@@ -111,8 +111,6 @@ CREATE TABLE `user_login_logs` (
   `device_id`    varchar(64)  NOT NULL DEFAULT '',
   `device_model` varchar(64)  NOT NULL DEFAULT '',
   `platform`     varchar(32)  NOT NULL DEFAULT '',
-  `signin_way`   tinyint      NOT NULL DEFAULT 0 COMMENT '登录方式编码（Passport 写入）',
-  `is_success`   tinyint(1)   NOT NULL DEFAULT 1 COMMENT '是否登录成功',
   `status`       varchar(32)  NOT NULL DEFAULT 'success',
   `fail_reason`  varchar(255) NOT NULL DEFAULT '',
   `created_at`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,

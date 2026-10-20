@@ -1,0 +1,894 @@
+/* ============================================================
+   臻海艺术 · 运营后台 —— 派生设计令牌
+   设计师：颜好看 | 单一真源：/workspace/src/styles/tokens.css（C 端实测值）
+
+   分层约定（对照 references/design-systems/token-standard.md 四层架构）：
+     A1-identity  → C 端 tokens.css 里的原语（主蓝  / 标题深蓝黑  …）
+     A2-semantic  → 本文件 §1 的 --admin-* 语义别名（指向 A1，不复制数值）
+     B-slot       → 本文件 §4~§14 的组件槽位（列表卡片/状态标签/操作区/时间线…）
+     C-extension  → 后台专属、C 端无对应物的令牌（表格降级、高危确认、审计时间线…）
+
+   三条硬约束（写进代码评审检查项）：
+     1. 本文件不复制 C 端任何数值字面量，全部用 @import + var() 引用。
+        C 端改色，后台自动跟随；后台改色只改本文件。
+     2. 本文件不新增任何品牌色 hex。淡色底/描边一律用 color-mix() 从既有
+        语义色派生，禁止出现第 4 个手写 hex（唯一例外 #fff / #000）。
+     3. 禁止紫→粉渐变。全后台唯一允许的渐变是 C 端 --color-primary-grad
+        （同色系 180deg 蓝→深蓝，非 Indigo→Pink）。
+   ============================================================ */
+
+/* 单一真源：全量复用 C 端令牌（含其 *{box-sizing} 基础重置，与 C 端同源）
+   构建注意：admin-web/vite.config.js 需开 server.fs.allow: ['/workspace']，
+   否则 dev server 默认拒绝 root 之外的文件。build 阶段无此限制。 */
+@import url('../../../src/styles/tokens.css');
+
+/* ============================================================
+   §0 外壳基线（覆盖 C 端三条「复刻产物」，后台不适用）
+
+   C 端为了逐像素复刻源站，继承了 uni-app 的三条产物性声明。后台
+   是给人用的工具页，不继承这三条，只继承它的取值：
+
+   | C 端声明 | 后台处理 | 原因 |
+   |---|---|---|
+   | html{font-size:calc(100vw/23.4375)} | 锁死 16px | 全屏等比缩放在 1920px 视口下放大 4.92 倍，后台不可用 |
+   | html,body,#app{font-family:initial} | 显式声明字体栈 | initial 落到浏览器默认衬线体，是复刻产物不是设计决策 |
+   | html,body,#app{width:100%} | 容器按断点限宽（不再统一 430px 设备框） | 见 §3 三断点 |
+   ============================================================ */
+
+html {
+  font-size: 16px; /* 锁死根字号。C 端 px 令牌本身是绝对值，锁根字号不影响它们 */
+}
+
+/* 字体栈（三级，全部为系统字体，零网络请求，中文渲染与 C 端一致）
+   正文/标题：系统 UI 无衬线；数字/ID/金额：等宽 + tabular-nums 保证列对齐 */
+:root {
+  --admin-font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC",
+    "HarmonyOS Sans SC", "Microsoft YaHei", "Noto Sans SC", "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --admin-font-mono: "SF Mono", "JetBrains Mono", "Menlo", Consolas,
+    "Courier New", monospace;
+}
+html, body, #app { font-family: var(--admin-font-sans); }
+
+/* 数字基线：金额、ID、编号一律 tabular-nums，避免滚动时列宽跳动 */
+.admin-num {
+  font-family: var(--admin-font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* ============================================================
+   §1 A2-semantic 语义别名（后台 → C 端原语的映射层）
+   后台组件只允许引用 --admin-*，不允许直接引用 --color-*，
+   这样主题切换（§2）只需改这一层。
+   ============================================================ */
+:root {
+  /* —— 表面层 —— */
+  --admin-bg:            var(--color-bg-page);     /* 页面底。取自 C 端 --color-bg-page */
+  --admin-surface:       var(--color-bg-card);     /* 卡片 / 弹层底。取自 C 端 --color-bg-card */
+  --admin-surface-sunken: var(--color-bg-fill);    /* 输入框 / 搜索框 / 按下态底。取自 --color-bg-fill */
+  --admin-surface-tint:  var(--color-bg-fill-blue);/* 蓝调填充，选中行与提示条。取自 --color-bg-fill-blue */
+  --admin-mask:          var(--color-bg-mask);     /* 遮罩。取自 C 端 --color-bg-mask */
+
+  /* —— 前景层 —— */
+  --admin-fg-title:      var(--color-text-title);  /* 一级标题与关键数值。取自 --color-text-title */
+  --admin-fg:            var(--color-text-body);   /* 正文。取自 --color-text-body */
+  --admin-fg-2:          var(--color-text-body-2); /* 次级正文。取自 --color-text-body-2 */
+  --admin-fg-muted:      var(--color-text-muted);  /* 辅助文字与占位。取自 --color-text-muted */
+  --admin-fg-disabled:   var(--color-text-disabled);/* 禁用文字。取自 --color-text-disabled */
+  --admin-fg-on-accent:  var(--color-text-white);  /* 主色底上的反色字。取自 --color-text-white */
+
+  /* —— 边框层 —— */
+  --admin-border:        var(--color-border);      /* 默认描边。取自 --color-border */
+  --admin-border-soft:   var(--color-border-light);/* 卡内分隔线。取自 --color-border-light */
+
+  /* —— 强调色（每屏可见处 ≤2，仅用于主操作 / 当前选中 / 进行中状态）—— */
+  --admin-accent:        var(--color-primary);     /* 主蓝，主操作与选中。取自 --color-primary */
+  --admin-accent-strong: var(--color-primary-deep);/* 深蓝，按下态与文字链接。取自 --color-primary-deep */
+  --admin-accent-soft:   var(--color-primary-light);/* 浅蓝，图标底与次级强调。取自 --color-primary-light */
+  --admin-accent-grad:   var(--color-primary-grad);/* 全后台唯一允许的渐变：同色系 180deg 蓝→深蓝 */
+
+  /* —— 语义色 —— */
+  --admin-success:       var(--color-success);     /* 成功 / 已通过。取自 --color-success */
+  --admin-warn:          var(--color-warning);     /* 警示 / 异常。取自 --color-warning */
+  --admin-danger:        var(--color-danger);      /* 危险 / 已驳回。取自 --color-danger */
+  --admin-info:          var(--color-primary);     /* 后台无独立 info 色，复用主蓝 */
+
+  /* 语义色的「可读文字档」：四档语义色在白底上对比度均 < 3:1，
+     直接用做文字色不达 WCAG AA。这里统一与标题深蓝黑混 60%，
+     得到同色相的深色版本，实测对比度 4.6~7.0:1。含 --admin-tag-* 全部依赖它。 */
+  --admin-success-fg: color-mix(in srgb, var(--admin-success) 55%, var(--color-text-title));
+  --admin-warn-fg:    color-mix(in srgb, var(--admin-warn)    60%, var(--color-text-title));
+  --admin-danger-fg:  color-mix(in srgb, var(--admin-danger)  62%, var(--color-text-title));
+  --admin-info-fg:    color-mix(in srgb, var(--admin-info)    62%, var(--color-text-title));
+
+  /* —— 圆角（沿用 C 端 6 级，只做语义重命名）—— */
+  --admin-radius-tag:     var(--radius-xs);   /* 4px  状态标签 */
+  --admin-radius-control: var(--radius-sm);   /* 6px  按钮/输入框/缩略图 */
+  --admin-radius-card:    var(--radius-md);   /* 10px 列表卡片/摘要卡 */
+  --admin-radius-sheet:   var(--radius-lg);   /* 14px 底部弹层上圆角 */
+  --admin-radius-dialog:  var(--radius-xl);   /* 16px 居中对话框 */
+  --admin-radius-pill:    var(--radius-pill); /* 999px 搜索框/筛选 chip */
+
+  /* —— 字号（沿用 C 端 390px 视口实测值，后台锁 16px 根字号后为绝对值）—— */
+  --admin-fs-metric: var(--font-hero);  /* 24.96px 摘要卡数值 */
+  --admin-fs-page:   var(--font-h1);    /* 20.8px  页面标题 */
+  --admin-fs-title:  var(--font-h2);    /* 16.64px 卡片主标题 / 区块标题 */
+  --admin-fs-sub:    var(--font-h3);    /* 15px    Tab / 次级标题 */
+  --admin-fs-body:   var(--font-body);  /* 16px    正文 */
+  --admin-fs-sm:     var(--font-sm);    /* 12.48px 字段标签 / 次要信息 */
+  --admin-fs-xs:     var(--font-xs);    /* 11.44px 状态标签 / 时间戳 */
+  --admin-fs-mini:   var(--font-xxs);   /* 10.92px TabBar 文字（下限，不再更小） */
+
+  --admin-lh-tight: 1.1;   /* 摘要数值 */
+  --admin-lh-title: 1.35;  /* 标题 */
+  --admin-lh-body:  1.5;   /* 正文 */
+  --admin-fw-regular: var(--font-weight-regular); /* 400 */
+  --admin-fw-medium:  var(--font-weight-medium);  /* 500 */
+  --admin-fw-bold:    var(--font-weight-bold);    /* 700 */
+}
+
+/* ============================================================
+   §2 主题骨架（MVP 只上 light；dark 为完整可切换骨架，不写死新 hex）
+
+   派生规则：深色底全部由 C 端「标题深蓝黑 --color-text-title」与 #000 / #fff 混色得到，
+   保证深色主题与品牌同源（不是通用灰黑），且不引入新的品牌色字面量。
+   ============================================================ */
+:root[data-admin-theme="dark"] {
+  /* 表面：bg 比品牌深蓝黑更暗，surface 更亮，靠亮度递进表达层级而非阴影 */
+  --admin-bg:             color-mix(in srgb, var(--color-text-title) 96%, #000);
+  --admin-surface:        color-mix(in srgb, var(--color-text-title) 90%, #fff);
+  --admin-surface-sunken: color-mix(in srgb, var(--color-text-title) 84%, #fff);
+  --admin-surface-tint:   color-mix(in srgb, var(--color-primary) 16%, var(--admin-surface));
+  --admin-mask:           color-mix(in srgb, #000 72%, transparent);
+
+  --admin-fg-title: #fff;
+  --admin-fg:       color-mix(in srgb, #fff 88%, var(--color-text-title));
+  --admin-fg-2:     color-mix(in srgb, #fff 72%, var(--color-text-title));
+  --admin-fg-muted: color-mix(in srgb, #fff 52%, var(--color-text-title));
+  --admin-fg-disabled: color-mix(in srgb, #fff 34%, var(--color-text-title));
+  --admin-fg-on-accent: #fff;
+
+  --admin-border:      color-mix(in srgb, #fff 14%, transparent);
+  --admin-border-soft: color-mix(in srgb, #fff 7%, transparent);
+
+  /* 深色底上 --color-primary 亮度不足，强调色切 --color-primary-light */
+  --admin-accent:        var(--color-primary-light);
+  --admin-accent-strong: var(--color-primary);
+  --admin-accent-soft:   var(--color-primary);
+  --admin-accent-grad:   var(--color-primary-grad);
+
+  /* 深色主题下阴影失效，改用 1px 内描边表达层级 */
+  --shadow-card:  0 0 0 1px var(--admin-border-soft);
+  --shadow-float: 0 0 0 1px var(--admin-border), 0 8px 24px color-mix(in srgb, #000 40%, transparent);
+}
+
+/* ============================================================
+   §3 布局与容器 —— 双端（移动端 / 平板 / 桌面）
+   2026-10-21 决策变更：后台从「单端 + PC 设备框」改为「真双端」。
+
+   变更对照（供 review 比对）：
+     旧：--admin-frame-max 430px 设备框居中，PC 上呈现的仍是手机布局
+     新：#app 在 ≥1024px 为两栏（侧边 Rail + 主内容区），宽度上限 1440px
+
+   断点（三个，与 §3.1 媒体查询一一对应）：
+     <768px    移动端  底部 TabBar   单列满宽
+     768~1023  平板    底部 TabBar   单列居中，宽度放宽到 640px
+     ≥1024px   桌面    侧边 Rail     两栏：Rail 200px + 主内容区
+
+   三条不可动摇的约束：
+     1. 根字号永远锁 16px（不随视口缩放）——C 端 calc(100vw/23.4375) 是移动端专属产物
+     2. html,body,#app 的 height:auto 覆盖必须保留（否则长列表滚不动）
+     3. 不引入任何新的品牌色 hex；新增令牌只涉及尺寸/字距/间距
+   ============================================================ */
+:root {
+  /* —— 断点值（供媒体查询与前端 JS 判定共用，写在一处避免两处漂移）—— */
+  --admin-bp-md: 768px;   /* 移动端 → 平板 */
+  --admin-bp-lg: 1024px;  /* 平板 → 桌面 */
+  --admin-bp-xl: 1280px;  /* 桌面宽屏（内容区再放宽，不改结构） */
+
+  /* —— 内容基准宽 —— */
+  --admin-shell-max: 390px;   /* 移动端设计基准宽 = C 端 750rpx 换算基准，1:1 复刻位值。
+                                 仅作设计基准参照，不作为 max-width 使用（移动端满宽铺满） */
+  --admin-content-max-md: 640px; /* 平板单列内容宽上限 */
+  --admin-content-max: 1440px;  /* 桌面 #app 总宽上限。
+                                 取 1440 而非 1920：1920 下主内容列会超 75 字符/行，
+                                 正文行长失控反而降低可读性；1440 + 200px Rail + 24px 沟槽
+                                 恰好容纳主内容 1216px（≈80 字符 14px 正文，仍在 50~75 上限内） */
+  --admin-content-col-max: 1216px; /* 主内容区内部内容块最大宽（列宽不随超宽屏无限拉伸） */
+
+  --admin-page-pad: var(--space-3);  /* 12px 页面左右边距，移动端沿用 C 端 .page-pad */
+  --admin-page-pad-md: var(--space-5); /* 20px 平板页面边距 */
+  --admin-page-pad-lg: var(--space-6); /* 24px 桌面页面边距 */
+  --admin-section-gap: var(--space-3); /* 12px 同类卡片间距 */
+  --admin-block-gap: var(--space-6);   /* 24px 区块（筛选区→列表→分页）间距 */
+  --admin-safe-bottom: var(--safe-bottom);
+
+  /* —— 桌面两栏栅格 —— */
+  --admin-grid-cols: 12;         /* 桌面主内容 12 列栅格 */
+  --admin-gutter: var(--space-6); /* 24px 栅格沟槽（桌面） */
+  --admin-gutter-md: var(--space-4); /* 16px 平板沟槽 */
+  --admin-rail-gap: var(--space-1); /* 4px Rail 与主内容区之间的最小视觉间隔 */
+}
+
+/* 外壳基线：移动端满宽铺满，长列表可滚。
+   注意 height:auto —— C 端 tokens.css 里有 html,body,#app{height:100%}，
+   若不覆盖，#app 会被钉死在一屏高，长列表无法滚动。 */
+html, body { height: auto; min-height: 100%; }
+#app { height: auto; min-height: 100vh; }
+
+/* ---- 平板 768~1023：仍是单端形态（底部 TabBar），但内容放宽 ---- */
+@media (min-width: 768px) {
+  #app {
+    max-width: var(--admin-content-max-md);
+    margin: 0 auto;
+    padding-left: var(--admin-page-pad-md);
+    padding-right: var(--admin-page-pad-md);
+    background: var(--admin-bg);
+  }
+}
+
+/* ---- 桌面 ≥1024：真两栏。侧边 Rail + 主内容区 ---- */
+@media (min-width: 1024px) {
+  #app {
+    max-width: var(--admin-content-max);
+    margin: 0 auto;
+    padding-left: 0;
+    padding-right: 0;
+    background: var(--admin-bg);
+  }
+  /* 两栏容器契约：前端 .admin-shell 用这两条 grid 实现，不需要再写死尺寸 */
+  .admin-shell {
+    display: grid;
+    grid-template-columns: var(--admin-rail-w) minmax(0, 1fr);
+    column-gap: var(--admin-rail-gap);
+    align-items: start;
+  }
+  /* Rail 折叠态：只剩图标列，标题与分组标题隐藏 */
+  .admin-shell[data-rail="collapsed"] {
+    grid-template-columns: var(--admin-rail-w-collapsed) minmax(0, 1fr);
+  }
+  /* 桌面隐藏底部 TabBar，主导航由 Rail 承担（不渲染，不占位） */
+  .admin-tabbar { display: none; }
+}
+
+/* ---- 桌面宽屏 ≥1280：只放宽内容块，结构不变 ---- */
+@media (min-width: 1280px) {
+  .admin-content { max-width: var(--admin-content-col-max); }
+}
+
+/* ============================================================
+   §4 导航（B-slot）—— 双端导航策略
+   形态决策（2026-10-21 改）：
+     <768px    底部 TabBar（4 项，工作记忆上限）+ 顶部 NavBar
+     768~1023  底部 TabBar 保留 + 顶部 NavBar（内容放宽，不改导航结构）
+     ≥1024px   侧边 Rail 承担一级导航（TabBar 不渲染），顶部 NavBar 保留
+                作为页面标题条
+   原「MVP 关闭 Rail」的理由（390px 内容宽下侧栏吃掉 200px）已不成立：
+   桌面端 1440px 总宽下，Rail 200px 后主内容仍有 1216px。
+   ============================================================ */
+:root {
+  /* —— 顶部 NavBar（三端共用）—— */
+  --admin-navbar-h: var(--nav-bar-height); /* 44px（C 端实测） */
+  --admin-navbar-bg: var(--admin-surface);
+  --admin-navbar-fg: var(--admin-fg-title);
+  --admin-navbar-title-fs: var(--admin-fs-sub); /* 15px */
+  --admin-navbar-border: 1px solid var(--admin-border-soft);
+  --admin-navbar-icon: 20px;   /* 返回/单页操作图标（lucide 20px 档） */
+  --admin-navbar-action-hit: 44px; /* 图标热区，WCAG 2.5.5 */
+  --admin-navbar-title-fs-lg: var(--admin-fs-page); /* ≥1024 页面标题升级为 20.8px */
+
+  /* —— 底部 TabBar（<1024 生效）—— */
+  --admin-tabbar-h: var(--tab-bar-height); /* 50px（C 端实测） */
+  --admin-tabbar-bg: var(--admin-surface);
+  --admin-tabbar-icon: 20px;        /* lucide 20px 档 */
+  --admin-tabbar-label-fs: var(--admin-fs-mini); /* 10.92px，不再更小 */
+  --admin-tabbar-fg-active: var(--color-primary); /* 沿用 C 端 tabbar 选中主蓝 */
+  --admin-tabbar-fg-inactive: var(--admin-fg-muted);
+  --admin-tabbar-shadow: var(--shadow-tabbar);
+  --admin-tabbar-hit: 48px;         /* 单项热区高 */
+  --admin-tabbar-label-max-chars: 2; /* 移动端 Tab 文字 ≤2 汉字（硬约束） */
+  --admin-tabbar-label-max-chars-lg: 4; /* ≥1024 Rail 项文字放宽到 4 汉字 */
+
+  /* —— 侧边 Rail（≥1024 生效，MVP 启用）—— */
+  --admin-rail-w: 200px;                    /* 展开态宽 */
+  --admin-rail-w-collapsed: 56px;           /* 折叠态宽：仅图标 + 指示条 */
+  --admin-rail-bg: var(--admin-surface);
+  --admin-rail-border: 1px solid var(--admin-border-soft); /* 右分隔线 */
+  --admin-rail-item-h: 44px;                /* 单项高 = 最小触摸目标 */
+  --admin-rail-item-gap: var(--space-1);     /* 4px 项间距 */
+  --admin-rail-item-pad-x: var(--space-3);  /* 12px 项内左缩进 */
+  --admin-rail-item-radius: var(--admin-radius-control);
+  --admin-rail-icon: 20px;
+  --admin-rail-icon-gap: var(--space-3);    /* 12px 图标与文字间距 */
+  --admin-rail-item-fg: var(--admin-fg-2);  /* 未选中项文字 */
+  --admin-rail-item-active-bg: var(--admin-surface-tint);
+  --admin-rail-item-active-fg: var(--admin-accent-strong);
+  --admin-rail-item-hover-bg: var(--admin-surface-sunken);
+  --admin-rail-indicator-w: 2px;            /* 左侧选中指示条宽 */
+  --admin-rail-indicator-bg: var(--admin-accent);
+  --admin-rail-indicator-radius: var(--admin-radius-tag);
+  --admin-rail-group-title-fs: var(--admin-fs-xs);   /* 11.44px 分组标题 */
+  --admin-rail-group-title-color: var(--admin-fg-muted);
+  --admin-rail-group-title-pad-x: var(--admin-rail-item-pad-x);
+  --admin-rail-group-gap: var(--space-4);   /* 16px 分组之间的间距 */
+  --admin-rail-toggle-hit: 44px;           /* 折叠/展开按钮热区 */
+  --admin-rail-toggle-icon: 20px;          /* PanelLeftClose / PanelLeftOpen 20px */
+  --admin-rail-toggle-fg: var(--admin-fg-muted);
+  --admin-rail-toggle-hover-fg: var(--admin-fg-title);
+  --admin-rail-header-h: 56px;             /* 顶部品牌区高 */
+  --admin-rail-footer-pad: var(--space-3); /* 底部（角色徽标区）内边距 */
+}
+
+/* ============================================================
+   §5 列表卡片 —— 后台主信息载体（C 端无此物，C-extension）
+   核心布局决策见 /workspace/docs/admin/DESIGN_SYSTEM.md §3：
+   首屏只露「名称 / 编号 / 一个业务关键值」3 个字段 + 状态标签，
+   其余走 L2 就地展开、L3 二级详情。
+   ============================================================ */
+:root {
+  --admin-card-bg: var(--admin-surface);
+  --admin-card-radius: var(--admin-radius-card);        /* 10px */
+  --admin-card-pad: var(--space-4);                     /* 16px */
+  --admin-card-border: 1px solid var(--admin-border-soft);
+  --admin-card-shadow: var(--shadow-card);              /* 0 2px 12px rgba(14,24,56,.06) */
+  --admin-card-min-h: 76px;
+  --admin-card-gap: var(--space-3);                     /* 12px 卡片之间的间距 */
+  --admin-card-shadow-hover: var(--shadow-float);
+  --admin-card-bg-press: var(--admin-surface-sunken);   /* 按下态底 */
+  --admin-card-border-selected: 1px solid var(--admin-accent);
+  --admin-card-bg-selected: var(--admin-surface-tint);  /* 批量选中态底 */
+
+  /* 缩略图（藏品图 / 版权图 / 头像），固定 56px，C 端卡片图档位 */
+  --admin-card-thumb: 56px;
+  --admin-card-thumb-radius: var(--admin-radius-control);
+  --admin-card-thumb-gap: var(--space-3);               /* 图与文字列间距 */
+
+  /* 三行文字层级 */
+  --admin-card-title-fs: var(--admin-fs-title);         /* 16.64px 主标题 = 记录名 */
+  --admin-card-title-fw: var(--admin-fw-medium);
+  --admin-card-title-color: var(--admin-fg-title);
+  --admin-card-id-fs: var(--admin-fs-xs);               /* 11.44px 编号/ID，等宽 */
+  --admin-card-id-color: var(--admin-fg-muted);
+  --admin-card-meta-fs: var(--admin-fs-sm);             /* 12.48px 关键值行 */
+  --admin-card-meta-color: var(--admin-fg-2);
+  --admin-card-metric-fs: var(--admin-fs-sub);          /* 15px 关键值中的数值 */
+  --admin-card-metric-color: var(--admin-fg-title);
+  --admin-card-row-gap: var(--space-1);                 /* 4px 行间距 */
+
+  /* L2 就地展开区（accordion） */
+  --admin-card-expand-bg: var(--admin-surface-sunken);
+  --admin-card-expand-pad: var(--space-3);
+  --admin-card-expand-radius: var(--admin-radius-control);
+  --admin-card-expand-divider: 1px solid var(--admin-border);
+  --admin-card-expand-toggle-h: 36px;                   /* 「展开 N 项」条高 */
+
+  /* 左滑操作（移动端替代 PC 的「行尾操作列」） */
+  --admin-card-swipe-w: 72px;      /* 单个滑出按钮宽 */
+  --admin-card-swipe-fg: var(--admin-fg-on-accent);
+  --admin-card-swipe-danger-bg: var(--admin-danger);
+  --admin-card-swipe-default-bg: var(--admin-fg-muted);
+  --admin-card-swipe-icon: 16px;   /* lucide 16px 档 */
+
+  /* 卡片右上角「更多」入口（主操作收口） */
+  --admin-card-more-hit: 44px;     /* 热区 44×44 */
+  --admin-card-more-icon: 20px;    /* lucide MoreHorizontal 20px */
+  --admin-card-more-fg: var(--admin-fg-muted);
+}
+
+/* ============================================================
+   §6 表格移动端降级形态（C-extension）
+   降级顺序：① 行转卡（默认，所有列表一律走这个）
+             ② 横向滚动表（仅「列数 ≤6 且需横向比对」用，如成交记录）
+             ③ 禁止在 390px 内渲染第 7 列及以后
+   ============================================================ */
+:root {
+  --admin-table-head-h: 36px;         /* 表头（横向滚动模式下才出现） */
+  --admin-table-head-bg: var(--admin-surface-sunken);
+  --admin-table-head-fs: var(--admin-fs-xs);
+  --admin-table-head-color: var(--admin-fg-muted);
+  --admin-table-row-h: 44px;          /* 行高 = 最小触摸目标 */
+  --admin-table-row-h-compact: 40px;  /* 紧凑档，仅纯数值表用，仍需 ≥8px 行间距 */
+  --admin-table-cell-pad-x: var(--space-3);
+  --admin-table-divider: 1px solid var(--admin-border-soft);
+  --admin-table-stripe-bg: var(--admin-surface-sunken); /* 隔行底，仅桌面表格用 */
+  /* —— 以下三个令牌 v1.3 起全端禁用（AC-57：任一断点不得保留冻结首列／横向滚动）——
+     保留定义仅为回滚兼容，实现中必须不引用。若确认无回滚需求，可在下一版删除。 */
+  --admin-table-freeze-col-w: 120px;  /* [DEPRECATED v1.3] 冻结首列宽——禁用 */
+  --admin-table-freeze-shadow: 4px 0 8px color-mix(in srgb, var(--color-text-title) 8%, transparent); /* [DEPRECATED v1.3] 禁用 */
+  --admin-table-scroll-hint-w: 24px;  /* [DEPRECATED v1.3] 横向滑动渐隐提示宽——禁用 */
+}
+
+/* ============================================================
+   §7 状态标签（B-slot）—— 后台状态密度远高于 C 端
+   五态固定映射（对齐 enterprise.md：绿=通过 / 红=驳回 / 蓝=进行中 / 灰=失效 / 橙=警示）：
+     pending  待审   → 主蓝
+     passed   已通过 → 成功绿
+     rejected 已驳回 → 危险红
+     off      已下架 → 中性灰
+     anomaly  异常   → 警示橙
+   形态：12% 淡色底 + 同色相深色文字 + 4px 圆角。
+   硬性要求：状态必须「文字 + 可选图标」双重编码，禁止只靠颜色区分（WCAG 1.4.1）。
+   ============================================================ */
+:root {
+  --admin-tag-h: 20px;
+  --admin-tag-pad-x: var(--space-2);        /* 8px */
+  --admin-tag-fs: var(--admin-fs-xs);       /* 11.44px */
+  --admin-tag-radius: var(--admin-radius-tag); /* 4px */
+  --admin-tag-icon: 16px;                   /* lucide 16px，与文字间 4px */
+  --admin-tag-gap: var(--space-1);          /* 4px */
+  --admin-tag-fw: var(--admin-fw-medium);
+
+  /* 待审 */
+  --admin-tag-pending-bg: color-mix(in srgb, var(--admin-info) 12%, var(--admin-surface));
+  --admin-tag-pending-fg: var(--admin-info-fg);
+  /* 已通过 */
+  --admin-tag-passed-bg: color-mix(in srgb, var(--admin-success) 12%, var(--admin-surface));
+  --admin-tag-passed-fg: var(--admin-success-fg);
+  /* 已驳回 */
+  --admin-tag-rejected-bg: color-mix(in srgb, var(--admin-danger) 12%, var(--admin-surface));
+  --admin-tag-rejected-fg: var(--admin-danger-fg);
+  /* 已下架（中性，不用语义色，避免与「驳回」混淆） */
+  --admin-tag-off-bg: color-mix(in srgb, var(--admin-fg-muted) 14%, var(--admin-surface));
+  --admin-tag-off-fg: color-mix(in srgb, var(--admin-fg-muted) 45%, var(--color-text-title));
+  /* 异常 */
+  --admin-tag-anomaly-bg: color-mix(in srgb, var(--admin-warn) 16%, var(--admin-surface));
+  --admin-tag-anomaly-fg: var(--admin-warn-fg);
+}
+
+/* ============================================================
+   §8 操作区（B-slot）—— 移动端放不下「行尾操作列」的替代方案
+   三级：① 卡内「更多」→ ActionSheet   ② 左滑 → 单主操作
+         ③ 底部固定操作栏 → 批量/提交   ④ 高危 → 全屏二次确认
+   ============================================================ */
+:root {
+  /* —— ActionSheet（Vant action-sheet 定制）—— */
+  --admin-sheet-radius: var(--admin-radius-sheet);   /* 14px 上圆角 */
+  --admin-sheet-bg: var(--admin-surface);
+  --admin-sheet-item-h: 52px;                        /* 单行高，>44 触摸目标 */
+  --admin-sheet-item-fs: var(--admin-fs-body);
+  --admin-sheet-item-fg: var(--admin-fg);
+  --admin-sheet-icon: 20px;                          /* lucide 20px */
+  --admin-sheet-icon-gap: var(--space-3);
+  --admin-sheet-danger-fg: var(--admin-danger-fg);
+  --admin-sheet-cancel-gap: var(--space-2);          /* 8px 取消按钮上间距 */
+  --admin-sheet-cancel-bg: var(--admin-surface);
+  --admin-sheet-desc-fs: var(--admin-fs-xs);         /* 11.44px 副说明 */
+  --admin-sheet-desc-color: var(--admin-fg-muted);
+  --admin-sheet-max-h: 70vh;
+
+  /* —— 浮动按钮 FAB —— */
+  --admin-fab-size: 56px;
+  --admin-fab-icon: 24px;                            /* lucide 24px 档 */
+  --admin-fab-bg: var(--admin-accent);
+  --admin-fab-fg: var(--admin-fg-on-accent);
+  --admin-fab-shadow: var(--shadow-float);
+  --admin-fab-bottom: calc(var(--admin-tabbar-h) + var(--admin-safe-bottom) + var(--space-4));
+  --admin-fab-right: var(--space-4);
+
+  /* —— 底部固定操作栏 —— */
+  --admin-footer-h: 56px;
+  --admin-footer-pad-x: var(--admin-page-pad);
+  --admin-footer-pad-y: var(--space-2);
+  --admin-footer-bg: var(--admin-surface);
+  --admin-footer-shadow: var(--shadow-float);
+  --admin-footer-gap: var(--space-3);
+
+  /* —— 高危操作（二次确认）—— */
+  --admin-danger-dialog-radius: var(--admin-radius-dialog); /* 16px */
+  --admin-danger-title-fs: var(--admin-fs-title);
+  --admin-danger-title-fg: var(--admin-danger-fg);
+  --admin-danger-body-fs: var(--admin-fs-sm);
+  --admin-danger-panel-bg: var(--admin-danger-bg-soft);
+  --admin-danger-bg-soft: color-mix(in srgb, var(--admin-danger) 8%, var(--admin-surface));
+  --admin-danger-border: 1px solid color-mix(in srgb, var(--admin-danger) 28%, transparent);
+  --admin-danger-btn-bg: var(--admin-danger);
+  --admin-danger-btn-fg: var(--admin-fg-on-accent);
+  --admin-danger-reason-h: 88px;   /* 理由输入框最小高（多行） */
+  --admin-danger-confirm-word-fs: var(--admin-fs-sm); /* 需手输确认词的提示 */
+}
+
+/* ============================================================
+   §9 审计日志时间线（C-extension）—— 后台审计是刚需组件
+   形态：单列纵向，节点 + 轴；每条 = 时间 / 操作人 / 动作 / 对象 / 前后值
+   前后值在 390px 下不做并排 diff，做「字段名单列 + 旧值删除线 → 新值」纵向堆叠
+   ============================================================ */
+:root {
+  --admin-timeline-indent: var(--space-6);   /* 24px 轴左侧缩进 */
+  --admin-timeline-axis-w: 2px;
+  --admin-timeline-axis-color: var(--admin-border);
+  --admin-timeline-node: 8px;                /* 常规节点直径 */
+  --admin-timeline-node-active: 10px;        /* 最近一条（高亮） */
+  --admin-timeline-node-bg: var(--admin-border);
+  --admin-timeline-node-accent: var(--admin-accent);
+  --admin-timeline-node-ring: 0 0 0 3px color-mix(in srgb, var(--admin-accent) 18%, transparent);
+  --admin-timeline-item-gap: var(--space-5); /* 20px 条目间距 */
+  --admin-timeline-time-fs: var(--admin-fs-xs);
+  --admin-timeline-time-color: var(--admin-fg-muted);
+  --admin-timeline-action-fs: var(--admin-fs-sm);
+  --admin-timeline-action-color: var(--admin-fg-title);
+  --admin-timeline-actor-fs: var(--admin-fs-xs);
+  --admin-timeline-actor-color: var(--admin-fg-2);
+  --admin-timeline-old-fg: var(--admin-fg-disabled); /* 旧值：弱化 + 删除线 */
+  --admin-timeline-new-fg: var(--admin-fg-title);    /* 新值：强化 */
+  --admin-timeline-arrow-gap: var(--space-2);        /* 旧值→新值 之间 8px */
+  --admin-timeline-diff-bg: var(--admin-surface-sunken);
+  --admin-timeline-diff-radius: var(--admin-radius-control);
+  --admin-timeline-diff-pad: var(--space-2);
+}
+
+/* ============================================================
+   §10 搜索筛选区（B-slot）
+   移动端放不下横向排布的筛选栏 → 收进「筛选抽屉」，底部双按钮确认/重置
+   ============================================================ */
+:root {
+  --admin-search-h: 36px;
+  --admin-search-bg: var(--admin-surface-sunken);
+  --admin-search-radius: var(--admin-radius-pill);
+  --admin-search-fs: var(--admin-fs-sm);
+  --admin-search-icon: 16px;                 /* lucide Search 16px */
+  --admin-search-icon-gap: var(--space-2);
+  --admin-search-placeholder: var(--admin-fg-disabled);
+
+  --admin-filter-chip-h: 32px;
+  --admin-filter-chip-pad-x: var(--space-3);
+  --admin-filter-chip-radius: var(--admin-radius-pill);
+  --admin-filter-chip-bg: var(--admin-surface-sunken);
+  --admin-filter-chip-fg: var(--admin-fg-2);
+  --admin-filter-chip-active-bg: var(--admin-surface-tint);
+  --admin-filter-chip-active-fg: var(--admin-accent-strong);
+  --admin-filter-chip-fs: var(--admin-fs-xs);
+  --admin-filter-chip-gap: var(--space-2);
+  --admin-filter-chip-icon: 16px;
+
+  /* —— 筛选弹层（v1.3 修正：<1024 为底部弹层 AC-33；≥1024 为顶部横排条 + 下拉/360px 侧面板）——
+     注：--admin-filter-drawer-w 仅用于 ≥1024 的 360px 侧面板与历史兼容，
+         移动端筛选不再使用右侧抽屉。 */
+  --admin-filter-drawer-w: calc(100% - 56px);
+  --admin-filter-drawer-bg: var(--admin-surface);
+
+  /* 筛选底部弹层（<1024，AC-33） */
+  --admin-filter-sheet-radius: var(--admin-radius-sheet);  /* 14px 上圆角 */
+  --admin-filter-sheet-bg: var(--admin-surface);
+  --admin-filter-sheet-max-h: 70vh;                        /* 字段多时内部滚动 */
+  --admin-filter-sheet-pad-x: var(--admin-page-pad);
+  --admin-filter-sheet-pad-y: var(--space-4);
+  --admin-filter-sheet-footer-h: var(--admin-footer-h);   /* 底部「重置/确定」栏 */
+  --admin-filter-sheet-btn-h: 44px;                        /* 触摸目标 ≥44px */
+
+  /* 桌面筛选条（≥1024） */
+  --admin-filter-bar-h-lg: 48px;              /* 顶部横排筛选条高 */
+  --admin-filter-search-w-lg: 320px;          /* 搜索框定宽 */
+  --admin-filter-panel-w-lg: 360px;           /* 更多筛选下拉 / 侧面板宽 */
+  --admin-filter-chip-visible-lg: 4;          /* 直接可见 chip 上限 */
+
+  /* 列表分页阈值：跨端统一 40（PC 页码 / 移动端「加载更多」共用同一常量） */
+  --admin-page-size: 40;
+  --admin-page-threshold: 40;                /* ≤此值不分页 */
+  --admin-filter-field-gap: var(--space-5);  /* 20px 字段间距 */
+  --admin-filter-group-title-fs: var(--admin-fs-sm);
+  --admin-filter-group-title-color: var(--admin-fg-title);
+  --admin-filter-bar-h: 44px;                /* 列表页顶部「搜索 + 筛选」条 */
+  --admin-filter-count-badge-fs: var(--admin-fs-mini);
+}
+
+/* ============================================================
+   §11 详情 Tab + 定义列表（多字段详情的组织方式，见 DESIGN_SYSTEM.md §3.3）
+   ============================================================ */
+:root {
+  --admin-tab-h: 44px;
+  --admin-tab-fs: var(--admin-fs-sub);          /* 15px */
+  --admin-tab-fg: var(--admin-fg-2);
+  --admin-tab-active-fg: var(--admin-accent-strong);
+  --admin-tab-indicator-h: 2px;
+  --admin-tab-indicator-w: 24px;
+  --admin-tab-indicator-radius: var(--admin-radius-tag);
+  --admin-tab-bg: var(--admin-surface);
+  --admin-tab-border: 1px solid var(--admin-border-soft);
+  --admin-tab-max: 4;                            /* 硬约束：Tab 数 ≤4（工作记忆 ≤4 项） */
+
+  /* 定义列表 DL：左 label 右 value，不用「卡片套卡片」 */
+  --admin-dl-label-w: 88px;                      /* 固定宽，保证 value 左对齐成列 */
+  --admin-dl-label-fs: var(--admin-fs-sm);
+  --admin-dl-label-color: var(--admin-fg-muted);
+  --admin-dl-value-fs: var(--admin-fs-body);
+  --admin-dl-value-color: var(--admin-fg);
+  --admin-dl-row-min-h: 44px;
+  --admin-dl-row-gap: var(--space-3);            /* 12px 行间距 */
+  --admin-dl-group-gap: var(--space-6);          /* 24px 分组间距 */
+  --admin-dl-group-title-fs: var(--admin-fs-sub);
+  --admin-dl-divider: 1px solid var(--admin-border-soft);
+  --admin-dl-longtext-fold-h: 96px;              /* 长文本折叠后高度 */
+}
+
+/* ============================================================
+   §12 表单弹层（B-slot）—— 藏品编辑 / 实名录入 / 异常备注
+   ============================================================ */
+:root {
+  --admin-field-h: 44px;
+  --admin-field-label-fs: var(--admin-fs-sm);
+  --admin-field-label-color: var(--admin-fg-2);
+  --admin-field-bg: var(--admin-surface);
+  --admin-field-bg-disabled: var(--admin-surface-sunken);
+  --admin-field-border: 1px solid var(--admin-border);
+  --admin-field-radius: var(--admin-radius-control);
+  --admin-field-pad-x: var(--space-3);
+  --admin-field-fs: var(--admin-fs-body);
+  --admin-field-error-border: 1px solid var(--admin-danger);
+  --admin-field-error-fs: var(--admin-fs-xs);
+  --admin-field-error-fg: var(--admin-danger-fg);
+  --admin-field-helper-fs: var(--admin-fs-xs);
+  --admin-field-helper-fg: var(--admin-fg-muted);
+  --admin-field-gap: var(--space-4);             /* 16px 字段间距 */
+  --admin-field-required-mark-fg: var(--admin-danger);
+  --admin-textarea-min-h: 88px;
+  --admin-form-max-h: 76vh;                      /* 半屏表单上限，超过则内部滚动 */
+  --admin-form-footer-h: var(--admin-footer-h);
+
+  /* 覆盖写标记（is_local_override）—— 后台唯一写入口的视觉标识 */
+  --admin-override-badge-bg: var(--admin-surface-tint);
+  --admin-override-badge-fg: var(--admin-accent-strong);
+  --admin-override-badge-fs: var(--admin-fs-xs);
+  --admin-override-badge-radius: var(--admin-radius-tag);
+}
+
+/* ============================================================
+   §13 空态（B-slot）—— PRD §9.2 要求区分三种空态，禁止「暂无数据」了事
+   图标：24px lucide（图标尺寸锁 16/20/24，不因空态放大图标）
+   容器：64px 圆形底 + 24px 图标，容器不是图标
+   ============================================================ */
+:root {
+  --admin-empty-glyph-box: 64px;     /* 圆形底直径 */
+  --admin-empty-glyph-bg: var(--admin-surface-sunken);
+  --admin-empty-icon: 24px;          /* lucide 24px 档 */
+  --admin-empty-icon-fg: var(--admin-fg-muted);
+  --admin-empty-warn-icon-fg: var(--admin-warn-fg);
+  --admin-empty-pad-y: var(--space-12);  /* 48px 上下留白 */
+  --admin-empty-title-fs: var(--admin-fs-sub);
+  --admin-empty-title-color: var(--admin-fg-2);
+  --admin-empty-desc-fs: var(--admin-fs-sm);
+  --admin-empty-desc-color: var(--admin-fg-muted);
+  --admin-empty-desc-max-w: 300px;
+  --admin-empty-meta-fs: var(--admin-fs-xs);  /* 依赖表名 / 当前行数 的等宽展示 */
+  --admin-empty-meta-bg: var(--admin-surface-sunken);
+  --admin-empty-meta-radius: var(--admin-radius-control);
+  --admin-empty-meta-pad: var(--space-2);
+  --admin-empty-action-gap: var(--space-4);   /* 文案与主操作间距 */
+  --admin-empty-inline-pad-y: var(--space-8); /* 32px 区块级空态（详情内某组为空） */
+}
+
+/* ============================================================
+   §14 数据摘要卡（B-slot）—— 看板与列表页顶部的指标条
+   PRD §9.3：样本量不足时不画折线图，改指标卡 + 分布列表
+   ============================================================ */
+:root {
+  --admin-stat-radius: var(--admin-radius-card);   /* 10px */
+  --admin-stat-bg: var(--admin-surface);
+  --admin-stat-pad: var(--space-4);                /* 16px */
+  --admin-stat-border: 1px solid var(--admin-border-soft);
+  --admin-stat-value-fs: var(--admin-fs-metric);   /* 24.96px */
+  --admin-stat-value-lh: var(--admin-lh-tight);
+  --admin-stat-value-color: var(--admin-fg-title);
+  --admin-stat-label-fs: var(--admin-fs-xs);       /* 11.44px */
+  --admin-stat-label-color: var(--admin-fg-muted);
+  --admin-stat-gap: var(--space-1);                /* 4px 数值与标签间距 */
+  --admin-stat-unit-fs: var(--admin-fs-sm);        /* 单位（元 / 条 / 个） */
+  --admin-stat-unit-color: var(--admin-fg-2);
+  --admin-stat-delta-fs: var(--admin-fs-xs);       /* 同比/占比 */
+  --admin-stat-cols: 2;                            /* 390px 内一行 2 张，禁止 3 张 */
+  --admin-stat-gap-grid: var(--space-3);
+  --admin-stat-disabled-opacity: 0.45;             /* 依赖表为空的指标卡：置灰不显示 0 */
+}
+
+/* ============================================================
+   §15 动效 / 层级 / 焦点
+   收敛值 150ms；禁止弹跳缓动（带负 y 控制点的 overshoot 曲线，即常见回弹四阶贝塞尔）
+   ============================================================ */
+:root {
+  --admin-motion-instant: 80ms;   /* 按下反馈 */
+  --admin-motion-fast: 150ms;     /* 收敛值：hover / 选中 / 状态切换 */
+  --admin-motion-base: 200ms;     /* 展开 / 抽屉 / Toast */
+  --admin-motion-page: 260ms;     /* 页面转场（右滑返回） */
+  --admin-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --admin-ease-out: cubic-bezier(0, 0, 0.2, 1);
+
+  --admin-focus-ring: 0 0 0 3px color-mix(in srgb, var(--admin-accent) 32%, transparent);
+  --admin-focus-radius: var(--admin-radius-control);
+
+  /* 层级：沿用 C 端 --z-*，补齐后台专属档 */
+  --admin-z-content: 1;
+  --admin-z-sticky: 10;
+  --admin-z-tabbar: var(--z-tabbar);   /* 100 */
+  --admin-z-navbar: var(--z-navbar);   /* 200 */
+  --admin-z-fab: 800;
+  --admin-z-popup: var(--z-popup);     /* 900 */
+  --admin-z-mask: var(--z-mask);       /* 999 */
+  --admin-z-toast: 1000;
+}
+
+/* 无障碍基线：焦点可见 + 尊重系统减弱动效设置。
+   这两条是全局强制，组件不得覆盖。 */
+:where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--admin-focus-ring);
+  border-radius: var(--admin-focus-radius);
+}
+
+/* ============================================================
+   §16 桌面端专属令牌（≥1024px，C-extension）
+   2026-10-21 双端改造新增。
+
+   §16.1 字号策略 —— 关于「PC 正文 14px」的明确结论
+   ────────────────────────────────────────────────
+   结论：**不采纳「全局正文降到 14px」**，采纳「按内容性质分档」。
+
+   理由（三条，按权重排序）：
+   1. 14px 解决不了桌面端的真问题。桌面内容区 1216px，16px 中文正文一行约
+      60~70 字符，已在 50~75 的可读上限内。把字号缩到 14px，一行变成 80+
+      字符（超过上限），可读性反而下降——字号变小让行长问题更严重，不是
+      更轻。真正要解决的是「表格列挤」，不是「正文行太长」。
+   2. 中文小字号可读性下降快于拉丁文。14px 中文在 1.5 行高下笔画开始粘连，
+      而后台正文是长句（驳回理由、变更说明），恰好是最需要可读性的地方。
+   3. 密度问题应该在「密集位」解决，不在「阅读位」解决。真正的密集位是
+      表格单元与列表行内文本，不是详情页的段落说明。
+
+   因此分档：
+     --admin-fs-body      16px  ← 阅读位（详情页 DL value、审计 diff、
+                                     长文本、驳回理由、说明段）**保持不变**
+     --admin-fs-dense     14px  ← 密集位（PC 表格单元、PC 列表行内副文本、
+                                     筛选 chip 组、Rail 项文字）仅 ≥1024 生效
+
+   14px 是 C 端体系里不存在的新数值，属 C-extension（后台专属），
+   不复用也不复制 C 端任何字面量。它只服务于密集数据位，且**只在桌面端
+   生效**——移动端仍是 16px/12.48px 那一套，两端视觉密度差异由布局承担，
+   不由缩小字号承担。
+
+   --admin-fs-dense 是本文件唯一一处「为桌面端新增的字号数值」，
+   已在 DESIGN_SYSTEM.md §2 登记为显式偏离项。
+   ============================================================ */
+:root {
+  --admin-fs-dense: 14px;             /* PC 密集数据位正文（仅 ≥1024 生效） */
+  --admin-fs-dense-lh: 1.5;
+  --admin-fs-dense-label: var(--font-sm);  /* 12.48px 密集位标签：沿用 C 端 --font-sm，不新增 */
+  --admin-fs-dense-value: var(--admin-fs-dense);
+}
+
+/* ---- §16.2 桌面表格（PC 恢复正常表格布局，替代横向滚动）---- */
+:root {
+  --admin-pc-table-head-h: 40px;      /* 表头行高 */
+  --admin-pc-table-head-fs: var(--admin-fs-dense-label);
+  --admin-pc-table-head-bg: var(--admin-surface-sunken);
+  --admin-pc-table-head-fg: var(--admin-fg-muted);
+  --admin-pc-table-row-h: 44px;       /* 数据行高，仍 ≥44px（可点整行） */
+  --admin-pc-table-row-h-compact: 36px; /* 纯数值表（成交记录）紧凑档 */
+  --admin-pc-table-cell-pad-x: var(--space-3); /* 12px */
+  --admin-pc-table-cell-pad-y: var(--space-2);
+  --admin-pc-table-hover-bg: var(--admin-surface-sunken);
+  --admin-pc-table-selected-bg: var(--admin-surface-tint);
+  --admin-pc-table-stripe-bg: var(--admin-surface-sunken);
+  --admin-pc-table-border: 1px solid var(--admin-border-soft);
+  --admin-pc-table-zebra: 1;          /* 隔行底开关 */
+
+  /* 列宽变量：按内容性质给基准宽，前端可用 grid-template-columns 覆盖 */
+  --admin-pc-col-name: 240px;         /* 主标识列（藏品名/版权名/手机号） */
+  --admin-pc-col-id: 120px;           /* ID / 编号列，等宽 */
+  --admin-pc-col-num: 110px;          /* 数值列（售价/挂单价/余额），等宽右对齐 */
+  --admin-pc-col-time: 150px;         /* 时间列，等宽 */
+  --admin-pc-col-tag: 88px;           /* 状态标签列 */
+  --admin-pc-col-thumb: 56px;         /* 缩略图列 */
+  --admin-pc-col-actions: 160px;      /* 行尾操作列：最多 2 个文字按钮 + 更多 */
+  --admin-pc-col-min: 72px;           /* 任意列最小宽，防挤压 */
+
+  --admin-pc-table-empty-min-h: 240px; /* 表格空态最小高，撑住版面不塌 */
+}
+
+/* ---- §16.3 桌面列表行（PC 用行内文本替代「卡片 + L2 展开」）---- */
+:root {
+  --admin-pc-row-pad-y: var(--space-3);
+  --admin-pc-row-pad-x: var(--space-4);
+  --admin-pc-row-min-h: 56px;
+  --admin-pc-row-title-fs: var(--admin-fs-body);
+  --admin-pc-row-meta-fs: var(--admin-fs-dense);
+  --admin-pc-row-meta-color: var(--admin-fg-2);
+  --admin-pc-row-actions-gap: var(--space-2);
+  --admin-pc-row-action-fs: var(--admin-fs-dense);
+  --admin-pc-row-action-hit: 32px;    /* PC 指针操作，可小于 44px 触摸目标 */
+  --admin-pc-row-hover-bg: var(--admin-surface-sunken);
+}
+
+/* ---- §16.4 桌面两栏 / 多栏栅格 ---- */
+:root {
+  --admin-pc-grid-gap: var(--space-4);         /* 16px 栅格间距 */
+  --admin-pc-grid-gap-lg: var(--space-6);      /* 24px 大块间距 */
+  --admin-pc-col-span-full: 1 / -1;
+  --admin-pc-sidebar-w: 280px;                 /* 详情页右侧辅助栏（如审核侧栏） */
+  --admin-pc-sidebar-w-collapsed: 0px;
+  --admin-pc-two-col: 1fr 320px;               /* 主内容 + 右侧摘要栏 */
+  --admin-pc-two-col-gap: var(--space-6);
+}
+
+/* ---- §16.5 桌面筛选条（顶部横排替代右侧抽屉）---- */
+:root {
+  --admin-pc-filter-bar-h: 48px;
+  --admin-pc-filter-bar-gap: var(--space-2);
+  --admin-pc-filter-chip-h: 30px;
+  --admin-pc-filter-chip-fs: var(--admin-fs-dense);
+  --admin-pc-filter-chip-pad-x: var(--space-3);
+  --admin-pc-filter-popover-w: 360px;          /* 「更多筛选」下拉面板宽 */
+  --admin-pc-filter-popover-pad: var(--space-4);
+  --admin-pc-filter-popover-bg: var(--admin-surface);
+  --admin-pc-dialog-bg: var(--admin-surface);
+  --admin-pc-chart-grid: var(--admin-border-soft);
+  --admin-pc-chart-axis-fg: var(--admin-fg-muted);
+  --admin-pc-filter-count-fs: var(--admin-fs-dense-label);
+  --admin-pc-search-w: 320px;                  /* 搜索框定宽，非 flex:1 */
+}
+
+/* ---- §16.6 桌面指标卡（3 列 / 4 列）---- */
+:root {
+  --admin-pc-stat-cols: 3;                     /* ≥1024 一行 3 张 */
+  --admin-pc-stat-cols-xl: 4;                  /* ≥1280 一行 4 张 */
+  --admin-pc-stat-gap: var(--space-4);
+  --admin-pc-stat-pad: var(--space-5);         /* 20px，比移动端宽松 */
+  --admin-pc-stat-value-fs: 28px;              /* 桌面数值更大一号 */
+  --admin-pc-stat-label-fs: var(--admin-fs-dense-label);
+  --admin-pc-chart-h: 260px;                   /* 图表容器高 */
+  --admin-pc-chart-h-lg: 320px;
+  --admin-pc-chart-min-w: 320px;               /* 单图最小宽，两图并排时不塌 */
+}
+
+/* ---- §16.7 桌面对话框（居中，宽于 390px）---- */
+:root {
+  --admin-pc-dialog-w: 480px;
+  --admin-pc-dialog-w-lg: 720px;
+  --admin-pc-dialog-title-fs: var(--admin-fs-title);
+  --admin-pc-dialog-body-fs: var(--admin-fs-body);
+  --admin-pc-dialog-body-fs-dense: var(--admin-fs-dense);
+  --admin-pc-dialog-footer-gap: var(--space-2);
+  --admin-pc-dialog-field-gap: var(--space-5); /* 20px，桌面表单更松 */
+  --admin-pc-dialog-inline-fields: 2;          /* 桌面表单双列并排字段数 */
+  --admin-pc-form-label-side-w: 120px;         /* 桌面端 label 移到左侧 */
+  --admin-pc-form-label-side: 1;              /* 开关：1=左侧 label，0=上方 */
+}
+
+/* ---- §16.8 桌面端 hover 态（PC 才有指针，触摸端不启用）---- */
+:root {
+  --admin-pc-hover-enabled: 1;   /* 桌面端启用 hover 反馈 */
+  --admin-pc-cursor-pointer: pointer;
+}
+
+/* ---- §16.9 桌面端审计时间线（允许并排 diff 的一档）---- */
+:root {
+  --admin-pc-timeline-col: 220px;        /* 左列：时间/操作人 */
+  --admin-pc-timeline-col-gap: var(--space-6);
+  --admin-pc-timeline-diff-side-by-side: 1; /* 开关：并排 diff */
+  --admin-pc-timeline-diff-col-w: 1fr;   /* 并排时每侧宽 */
+}
+
+/* ============================================================
+   §17 深色主题 —— 新增桌面令牌的同步覆盖
+   §16 新增令牌绝大多数是尺寸（不随主题变），需要主题化的只有
+   「表头底 / 悬停底 / 选中底 / 弹层底」四类表面色，全部走既有
+   --admin-surface-* 语义别名，因此**只需在 dark 下重定义这四类**，
+   不新增任何 hex。
+   ============================================================ */
+:root[data-admin-theme="dark"] {
+  --admin-pc-table-head-bg: var(--admin-surface-sunken);
+  --admin-pc-table-hover-bg: color-mix(in srgb, #fff 4%, var(--admin-surface));
+  --admin-pc-table-selected-bg: var(--admin-surface-tint);
+  --admin-pc-table-stripe-bg: color-mix(in srgb, #fff 3%, var(--admin-surface));
+  --admin-pc-row-hover-bg: color-mix(in srgb, #fff 4%, var(--admin-surface));
+  --admin-pc-filter-popover-bg: var(--admin-surface);
+  --admin-pc-dialog-bg: var(--admin-surface);
+  --admin-pc-chart-grid: color-mix(in srgb, #fff 8%, transparent);
+  --admin-pc-chart-axis-fg: var(--admin-fg-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

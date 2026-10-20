@@ -6,7 +6,7 @@
 >
 > 机器可读契约：`/workspace/docs/admin/openapi.yaml`（OpenAPI 3.0.3，34 个端点）
 > 数据库 DDL：`/workspace/database/admin_schema.sql`（11 张新表，已在 `shengtai` 库实测执行通过）
-> 决策记录：`/workspace/docs/admin/decisions/ADR-001.md` ~ `ADR-009.md`
+> 决策记录：`/workspace/docs/admin/decisions/ADR-001.md` ~ `ADR-013.md`
 
 ---
 
@@ -862,6 +862,10 @@ grep -rnE "#[0-9a-fA-F]{3,6}\b" /workspace/admin-web/src --include=*.vue --inclu
 | [ADR-007](decisions/ADR-007.md) | C 端隔离机制 | 影子覆盖表 + `is_local_override`，不 ALTER 现有表 |
 | [ADR-008](decisions/ADR-008.md) | runtime 目录隔离 | `setRuntimePath` + `mkdir -p runtime/admin` |
 | [ADR-009](decisions/ADR-009.md) | 操作审计 | 独立中间件 + 同步落库 + 密码脱敏 |
+| [ADR-010](decisions/ADR-010.md) | 双端形态 | 真双端：768/1024/1284 三断点，桌面 Rail + 表格 |
+| [ADR-011](decisions/ADR-011.md) | 桌面派生列 JOIN 与字段选型（Q16） | 读库核对 6 组派生列来源；新增 `admin_audit_records` |
+| [ADR-012](decisions/ADR-012.md) | 导航权限映射 + 字段集单一真源 | 后端下发 nav_items 业务树 + 内联 fields 元数据 |
+| [ADR-013](decisions/ADR-013.md) | 导出接口与跨端分页 | 后端流式 CSV + `pageSize` 默认 40 跨端统一 |
 
 ---
 

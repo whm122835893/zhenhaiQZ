@@ -65,10 +65,24 @@ final class Snowflake
 
     /**
      * 生成字符串形式的 ID —— 接口层一律用它，避免 JSON 序列化丢精度
+     *
+     * ⚠️ 必须复用静态单例，不能每次 new
+     *
+     * 序列号与 lastTimestamp 是**实例状态**。若每次调用都 new 一个新实例，
+     * 则同一毫秒内每次的 sequence 都从 0 开始、lastTimestamp 都是 -1，
+     * 生成出的 ID 完全相同。实测（2026-10-20）：连调 5 次 nextIdStr() 只得到
+     * 1 个唯一 ID，主键冲突 Duplicate entry '...' for key 'PRIMARY'。
+     *
+     * 改为静态单例后：同毫秒内 sequence 递增，不同毫秒重置，
+     * 既保证唯一又不阻塞等待。
      */
     public static function nextIdStr(int $workerId = 1): string
     {
-        return (string)(new self($workerId))->nextId();
+        static $instances = [];
+        if (!isset($instances[$workerId])) {
+            $instances[$workerId] = new self($workerId);
+        }
+        return (string)$instances[$workerId]->nextId();
     }
 
     private function currentMillis(): int

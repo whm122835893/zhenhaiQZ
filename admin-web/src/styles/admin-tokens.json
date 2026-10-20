@@ -1,0 +1,218 @@
+{
+  "$meta": {
+    "product": "臻海艺术 · 运营后台",
+    "designer": "颜好看",
+    "register": "product",
+    "platform": "web",
+    "form": "dual-end: mobile-390 / tablet-640 / desktop-1440 (rail 200 + content)",
+    "iconLibrary": "lucide-vue-next@1.0.0",
+    "iconSizes": [16, 20, 24],
+    "iconStrokeWidth": 1.75,
+    "sourceOfTruth": "../../../src/styles/tokens.css",
+    "derivedFile": "admin-tokens.css",
+    "scales": { "variance": 3, "motion": 3, "density": 7 }
+  },
+  "color": {
+    "bg":            { "value": "{--admin-bg}",             "type": "color", "from": "c-end --color-bg-page" },
+    "surface":       { "value": "{--admin-surface}",        "type": "color", "from": "c-end --color-bg-card" },
+    "surfaceSunken": { "value": "{--admin-surface-sunken}", "type": "color", "from": "c-end --color-bg-fill" },
+    "surfaceTint":   { "value": "{--admin-surface-tint}",   "type": "color", "from": "c-end --color-bg-fill-blue" },
+    "fgTitle":       { "value": "{--admin-fg-title}",       "type": "color", "from": "c-end --color-text-title" },
+    "fg":            { "value": "{--admin-fg}",             "type": "color", "from": "c-end --color-text-body" },
+    "fg2":           { "value": "{--admin-fg-2}",           "type": "color", "from": "c-end --color-text-body-2" },
+    "fgMuted":       { "value": "{--admin-fg-muted}",       "type": "color", "from": "c-end --color-text-muted" },
+    "fgDisabled":    { "value": "{--admin-fg-disabled}",    "type": "color", "from": "c-end --color-text-disabled" },
+    "border":        { "value": "{--admin-border}",         "type": "color", "from": "c-end --color-border" },
+    "borderSoft":    { "value": "{--admin-border-soft}",    "type": "color", "from": "c-end --color-border-light" },
+    "accent":        { "value": "{--admin-accent}",         "type": "color", "from": "c-end --color-primary" },
+    "accentStrong":  { "value": "{--admin-accent-strong}",  "type": "color", "from": "c-end --color-primary-deep" },
+    "success":       { "value": "{--admin-success}",        "type": "color", "from": "c-end --color-success" },
+    "warn":          { "value": "{--admin-warn}",           "type": "color", "from": "c-end --color-warning" },
+    "danger":        { "value": "{--admin-danger}",         "type": "color", "from": "c-end --color-danger" }
+  },
+  "font": {
+    "sans": { "value": "{--admin-font-sans}", "type": "fontFamily" },
+    "mono": { "value": "{--admin-font-mono}", "type": "fontFamily" },
+    "size": {
+      "metric": { "value": "{--admin-fs-metric}", "px": 24.96, "type": "dimension" },
+      "page":   { "value": "{--admin-fs-page}",   "px": 20.8,  "type": "dimension" },
+      "title":  { "value": "{--admin-fs-title}",  "px": 16.64, "type": "dimension" },
+      "sub":    { "value": "{--admin-fs-sub}",    "px": 15,    "type": "dimension" },
+      "body":   { "value": "{--admin-fs-body}",   "px": 16,    "type": "dimension" },
+      "sm":     { "value": "{--admin-fs-sm}",     "px": 12.48, "type": "dimension" },
+      "xs":     { "value": "{--admin-fs-xs}",     "px": 11.44, "type": "dimension" },
+      "mini":   { "value": "{--admin-fs-mini}",   "px": 10.92, "type": "dimension" }
+    },
+    "weight": { "regular": 400, "medium": 500, "bold": 700 }
+  },
+  "radius": {
+    "tag":     { "value": "{--admin-radius-tag}",     "px": 4,    "type": "dimension" },
+    "control": { "value": "{--admin-radius-control}", "px": 6,    "type": "dimension" },
+    "card":    { "value": "{--admin-radius-card}",    "px": 10,   "type": "dimension" },
+    "sheet":   { "value": "{--admin-radius-sheet}",   "px": 14,   "type": "dimension" },
+    "dialog":  { "value": "{--admin-radius-dialog}",  "px": 16,   "type": "dimension" },
+    "pill":    { "value": "{--admin-radius-pill}",    "px": 999,  "type": "dimension" }
+  },
+  "space": {
+    "1": { "px": 4, "value": "{--space-1}", "type": "dimension" },
+    "2": { "px": 8, "value": "{--space-2}", "type": "dimension" },
+    "3": { "px": 12, "value": "{--space-3}", "type": "dimension" },
+    "4": { "px": 16, "value": "{--space-4}", "type": "dimension" },
+    "5": { "px": 20, "value": "{--space-5}", "type": "dimension" },
+    "6": { "px": 24, "value": "{--space-6}", "type": "dimension" },
+    "8": { "px": 32, "value": "{--space-8}", "type": "dimension" },
+    "12": { "px": 48, "value": "{--space-12}", "type": "dimension" }
+  },
+  "layout": {
+    "shellMax":  { "px": 390, "value": "{--admin-shell-max}", "note": "移动端设计基准宽 = C 端 750rpx 换算基准（仅作参照，不作 max-width）" },
+    "contentMaxMd": { "px": 640, "value": "{--admin-content-max-md}", "note": "平板单列内容宽上限" },
+    "contentMax": { "px": 1440, "value": "{--admin-content-max}", "note": "桌面 #app 总宽上限" },
+    "contentColMax": { "px": 1216, "value": "{--admin-content-col-max}", "note": "桌面主内容块最大宽，防行长失控" },
+    "breakpoints": {
+      "md": { "px": 768,  "value": "{--admin-bp-md}", "note": "移动端 → 平板" },
+      "lg": { "px": 1024, "value": "{--admin-bp-lg}", "note": "平板 → 桌面（侧边 Rail 启用）" },
+      "xl": { "px": 1280, "value": "{--admin-bp-xl}", "note": "桌面宽屏（只放宽内容块）" }
+    },
+    "pagePad":   { "px": 12, "value": "{--admin-page-pad}", "note": "移动端" },
+    "pagePadMd": { "px": 20, "value": "{--admin-page-pad-md}" },
+    "pagePadLg": { "px": 24, "value": "{--admin-page-pad-lg}" },
+    "sectionGap": { "px": 12, "value": "{--admin-section-gap}" },
+    "blockGap":  { "px": 24, "value": "--admin-block-gap" },
+    "gridCols":  { "px": 12, "value": "{--admin-grid-cols}", "note": "桌面主内容 12 列栅格" },
+    "gutter":    { "px": 24, "value": "{--admin-gutter}" },
+    "railW":     { "px": 200, "value": "{--admin-rail-w}", "note": "桌面侧边 Rail 展开态" },
+    "railWCollapsed": { "px": 56, "value": "{--admin-rail-w-collapsed}", "note": "折叠态：仅图标 + 指示条" }
+  },
+  "desktop": {
+    "fsDense":  { "px": 14, "value": "{--admin-fs-dense}", "note": "仅 >=1024 的密集数据位正文；阅读位正文仍 16px" },
+    "table": {
+      "headHeight": { "px": 40, "value": "{--admin-pc-table-head-h}" },
+      "rowHeight":  { "px": 44, "value": "{--admin-pc-table-row-h}" },
+      "rowHeightCompact": { "px": 36, "value": "{--admin-pc-table-row-h-compact}" },
+      "colName":    { "px": 240, "value": "{--admin-pc-col-name}" },
+      "colId":      { "px": 120, "value": "{--admin-pc-col-id}" },
+      "colNum":     { "px": 110, "value": "{--admin-pc-col-num}" },
+      "colTime":    { "px": 150, "value": "{--admin-pc-col-time}" },
+      "colTag":     { "px": 88,  "value": "{--admin-pc-col-tag}" },
+      "colActions": { "px": 160, "value": "{--admin-pc-col-actions}", "note": "最多 2 个文字按钮 + 更多" }
+    },
+    "statCols":   { "px": 3, "value": "{--admin-pc-stat-cols}", "note": ">=1024 指标卡一行 3 张" },
+    "statColsXl": { "px": 4, "value": "{--admin-pc-stat-cols-xl}" },
+    "chartHeight": { "px": 260, "value": "{--admin-pc-chart-h}" },
+    "dialogWidth": { "px": 480, "value": "{--admin-pc-dialog-w}" },
+    "filterPopoverWidth": { "px": 360, "value": "{--admin-pc-filter-popover-w}" },
+    "searchWidth": { "px": 320, "value": "{--admin-pc-search-w}" }
+  },
+  "component": {
+    "listCard": {
+      "pad": { "px": 16, "value": "{--admin-card-pad}" },
+      "gap": { "px": 12, "value": "{--admin-card-gap}" },
+      "minHeight": { "px": 76, "value": "{--admin-card-min-h}" },
+      "thumb": { "px": 56, "value": "{--admin-card-thumb}" },
+      "expandToggleHeight": { "px": 36, "value": "{--admin-card-expand-toggle-h}" },
+      "swipeWidth": { "px": 72, "value": "{--admin-card-swipe-w}" },
+      "moreHit": { "px": 44, "value": "{--admin-card-more-hit}" },
+      "l1Fields": 3
+    },
+    "statusTag": {
+      "height": { "px": 20, "value": "{--admin-tag-h}" },
+      "padX": { "px": 8, "value": "{--admin-tag-pad-x}" },
+      "icon": { "px": 16, "value": "{--admin-tag-icon}" },
+      "variants": ["pending", "passed", "rejected", "off", "anomaly"]
+    },
+    "searchFilter": {
+      "searchHeight": { "px": 36, "value": "{--admin-search-h}" },
+      "chipHeight": { "px": 32, "value": "{--admin-filter-chip-h}" },
+      "barHeight": { "px": 44, "value": "{--admin-filter-bar-h}" },
+      "drawerWidth": { "value": "{--admin-filter-drawer-w}", "expr": "calc(100% - 56px)", "note": "DEPRECATED v1.3：移动端筛选已改底部弹层（AC-33），此令牌仅保留兼容" },
+      "mobileForm": "bottom-sheet",
+      "sheetRadius": { "value": "{--admin-filter-sheet-radius}" },
+      "sheetMaxHeight": { "value": "{--admin-filter-sheet-max-h}", "expr": "70vh" },
+      "sheetFooterHeight": { "px": 56, "value": "{--admin-filter-sheet-footer-h}" },
+      "sheetButtonHeight": { "px": 44, "value": "{--admin-filter-sheet-btn-h}" },
+      "lgBarHeight": { "px": 48, "value": "{--admin-filter-bar-h-lg}" },
+      "lgSearchWidth": { "px": 320, "value": "{--admin-filter-search-w-lg}" },
+      "lgPanelWidth": { "px": 360, "value": "{--admin-filter-panel-w-lg}" },
+      "lgChipVisibleMax": { "value": "{--admin-filter-chip-visible-lg}" }
+    },
+    "pagination": {
+      "pageSize": { "value": "{--admin-page-size}" },
+      "threshold": { "value": "{--admin-page-threshold}" },
+      "note": "跨端统一 40；PC 页码与移动端「加载更多」共用同一常量"
+    },
+    "detailTabs": {
+      "height": { "px": 44, "value": "{--admin-tab-h}" },
+      "maxTabs": 4,
+      "indicatorWidth": { "px": 24, "value": "{--admin-tab-indicator-w}" }
+    },
+    "defList": {
+      "labelWidth": { "px": 88, "value": "{--admin-dl-label-w}" },
+      "rowMinHeight": { "px": 44, "value": "{--admin-dl-row-min-h}" },
+      "longTextFoldHeight": { "px": 96, "value": "{--admin-dl-longtext-fold-h}" }
+    },
+    "formSheet": {
+      "fieldHeight": { "px": 44, "value": "{--admin-field-h}" },
+      "textareaMinHeight": { "px": 88, "value": "{--admin-textarea-min-h}" },
+      "maxHeight": { "value": "{--admin-form-max-h}", "expr": "76vh" }
+    },
+    "actionSheet": {
+      "itemHeight": { "px": 52, "value": "{--admin-sheet-item-h}" },
+      "icon": { "px": 20, "value": "{--admin-sheet-icon}" },
+      "maxHeight": { "value": "{--admin-sheet-max-h}", "expr": "70vh" }
+    },
+    "footerBar": {
+      "height": { "px": 56, "value": "{--admin-footer-h}" },
+      "maxButtons": 2
+    },
+    "fab": { "size": { "px": 56, "value": "{--admin-fab-size}" }, "icon": { "px": 24, "value": "{--admin-fab-icon}" } },
+    "statCard": {
+      "pad": { "px": 16, "value": "{--admin-stat-pad}" },
+      "valueSize": { "px": 24.96, "value": "{--admin-stat-value-fs}" },
+      "columns": 2,
+      "disabledOpacity": 0.45
+    },
+    "emptyState": {
+      "glyphBox": { "px": 64, "value": "{--admin-empty-glyph-box}" },
+      "icon": { "px": 24, "value": "{--admin-empty-icon}" },
+      "padY": { "px": 48, "value": "{--admin-empty-pad-y}" },
+      "descMaxWidth": { "px": 300, "value": "{--admin-empty-desc-max-w}" }
+    },
+    "auditTimeline": {
+      "indent": { "px": 24, "value": "{--admin-timeline-indent}" },
+      "axisWidth": { "px": 2, "value": "{--admin-timeline-axis-w}" },
+      "node": { "px": 8, "value": "{--admin-timeline-node}" },
+      "nodeActive": { "px": 10, "value": "{--admin-timeline-node-active}" },
+      "itemGap": { "px": 20, "value": "{--admin-timeline-item-gap}" },
+      "diffLayout": "vertical-stack (禁止 390px 下并排 diff)"
+    },
+    "tableDegrade": {
+      "headHeight": { "px": 36, "value": "{--admin-table-head-h}" },
+      "rowHeight": { "px": 44, "value": "{--admin-table-row-h}" },
+      "freezeColWidth": { "px": 120, "value": "{--admin-table-freeze-col-w}", "deprecated": "v1.3 AC-57 全端禁用冻结首列，仅回滚兼容" },
+      "maxColumns": 6,
+      "horizontalScroll": false,
+      "note": "v1.3：全端无横向滚动表格、无冻结首列；<1024 列表一律卡片流"
+    },
+    "nav": {
+      "navbarHeight": { "px": 44, "value": "{--admin-navbar-h}" },
+      "tabbarHeight": { "px": 50, "value": "{--admin-tabbar-h}" },
+      "tabbarIcon": { "px": 20, "value": "{--admin-tabbar-icon}" },
+      "railWidth": { "px": 200, "value": "{--admin-rail-w}", "enabled": false, "note": "MVP 关闭，宽屏预留" }
+    }
+  },
+  "motion": {
+    "instant": { "ms": 80, "value": "{--admin-motion-instant}" },
+    "fast":    { "ms": 150, "value": "{--admin-motion-fast}" },
+    "base":    { "ms": 200, "value": "{--admin-motion-base}" },
+    "page":    { "ms": 260, "value": "{--admin-motion-page}" },
+    "easeStandard": { "value": "cubic-bezier(0.2, 0, 0, 1)" },
+    "forbidden": ["overshoot / bounce easing with negative y control points"]
+  },
+  "a11y": {
+    "minTouchTarget": { "px": 44 },
+    "textContrast": "4.5:1",
+    "statusEncoding": "文字 + 颜色双重编码，禁止只靠颜色",
+    "focusRing": "{--admin-focus-ring}",
+    "reducedMotion": "全局收敛到 0.01ms"
+  }
+}

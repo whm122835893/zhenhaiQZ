@@ -153,7 +153,7 @@ paths:
       summary: 核心指标概览
       parameters:
         - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
-        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 40, maximum: 100 } }
       responses:
         '200':
           description: OK
@@ -251,7 +251,7 @@ paths:
       summary: 藏品列表（返回基础值 + 后台覆盖标记）
       parameters:
         - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
-        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 40, maximum: 100 } }
         - { name: keyword, in: query, schema: { type: string, description: '按藏品名模糊匹配' } }
         - { name: status, in: query, schema: { type: string, enum: [on, off, sold_out] } }
         - { name: cid, in: query, schema: { type: string, description: '分类ID' } }
@@ -348,7 +348,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/Iid'
         - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
-        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 40, maximum: 100 } }
       responses:
         '200':
           description: OK
@@ -370,7 +370,7 @@ paths:
       summary: 版权条目列表
       parameters:
         - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
-        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 40, maximum: 100 } }
         - { name: keyword, in: query, schema: { type: string } }
       responses:
         '200':
@@ -437,7 +437,7 @@ paths:
       summary: 作者列表
       parameters:
         - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
-        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 40, maximum: 100 } }
         - { name: keyword, in: query, schema: { type: string } }
       responses:
         '200':
@@ -515,7 +515,7 @@ paths:
       summary: 挂单列表
       parameters:
         - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
-        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 40, maximum: 100 } }
         - { name: status, in: query, schema: { type: integer, enum: [0, 1, 2], description: '0=已下架 1=在售 2=已售' } }
         - { name: marketType, in: query, schema: { type: integer, enum: [1, 2, 3], description: '1=寄售 2=求购 3=委托' } }
         - { name: iid, in: query, schema: { type: string } }
@@ -568,7 +568,7 @@ paths:
       summary: 成交记录
       parameters:
         - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
-        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 40, maximum: 100 } }
         - { name: iid, in: query, schema: { type: string } }
         - { name: nftId, in: query, schema: { type: string } }
         - { name: startTime, in: query, schema: { type: string, description: '13位毫秒字符串' } }
@@ -591,7 +591,7 @@ paths:
       summary: NFT 资产列表
       parameters:
         - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
-        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 40, maximum: 100 } }
         - { name: uid, in: query, schema: { type: string } }
         - { name: iid, in: query, schema: { type: string } }
         - { name: sellStatus, in: query, schema: { type: string, enum: [none, on_sale, sold] } }
@@ -616,7 +616,7 @@ paths:
       summary: 用户列表
       parameters:
         - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
-        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 40, maximum: 100 } }
         - { name: keyword, in: query, schema: { type: string, description: '手机号/昵称模糊匹配' } }
         - { name: status, in: query, schema: { type: string, enum: [normal, frozen, banned] } }
         - { name: hasRealName, in: query, schema: { type: integer, enum: [0, 1] } }
@@ -704,7 +704,7 @@ paths:
       summary: 实名审核列表
       parameters:
         - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
-        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 40, maximum: 100 } }
         - { name: hasRealName, in: query, schema: { type: integer, enum: [0, 1], default: 0 } }
       responses:
         '200':
@@ -752,7 +752,7 @@ paths:
       summary: 后台账号列表
       parameters:
         - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
-        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 40, maximum: 100 } }
         - { name: keyword, in: query, schema: { type: string } }
         - { name: status, in: query, schema: { type: integer, enum: [0, 1] } }
       responses:
@@ -939,7 +939,7 @@ paths:
       summary: 操作审计日志
       parameters:
         - { name: pageNo, in: query, schema: { type: integer, default: 1 } }
-        - { name: pageSize, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 40, maximum: 100 } }
         - { name: adminId, in: query, schema: { type: string } }
         - { name: module, in: query, schema: { type: string } }
         - { name: action, in: query, schema: { type: string } }
