@@ -75,8 +75,8 @@ const detail = {
   sn: '000018330',
   author: 'NewBee',
   publishTime: '2026-08-15',
-  model3d: 'https://file.newbee.net.cn/uploads/20220304/9320a583c01b09fa86d76a5a67a3854d.gltf',
-  image: 'https://file.newbee.net.cn/uploads/20260815/ddb85227966dc6238305e4b244a7fc81.jpg',
+  model3d: '/static/model3d/demo-model.gltf',
+  image: '/static/model3d/demo-cover.jpg',
 }
 
 const speeds = [

@@ -202,12 +202,16 @@ const showQuantityModal = ref(false)
 const stageInfoMarginTop = ref('-234px')
 const showBatchPopup = ref(false)
 
-/** 3D 播放器地址：参数与原站 iframe 完全一致 */
+/** 3D 播放器地址：参数与原站 iframe 完全一致
+ *  ⚠️ 不能传 orbit 参数：值里的 %25（编码的 %）经预览网关二次解码会变成
+ *  裸 %，网关无法用该 URL 构建上游请求，iframe 直接收到
+ *  {"error":"failed to build request"}。index.html 内置默认值
+ *  orbit='0deg 90deg 105%' 与原站参数一致，不传即等效。 */
 const modelViewerUrl = computed(
   () =>
     `/static/model3d/index.html?modelurl=${encodeURIComponent(detail.model3d)}` +
     `&imgurl=${encodeURIComponent(item.imageUrl || '')}` +
-    `&applytexture=1&rot=1&delay=500&speed=200%25&orbit=0deg%2090deg%20105%25&autofront=1&touch=1`
+    `&applytexture=1&rot=1&delay=500&speed=200%25&autofront=1&touch=1`
 )
 
 /** 底部价格：amountFormat 把「分」转元，前缀￥ */

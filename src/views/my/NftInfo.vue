@@ -11,9 +11,11 @@
       <!-- 3D 模型查看器（原站 nb-model-viewer，模型 /static/model3d/model.gltf） -->
       <div class="art3d-wrap">
         <div class="nbmv">
+          <!-- ⚠️ 不传 orbit：%25 经预览网关二次解码成裸 % 导致请求构建失败，
+               index.html 内置默认 orbit='0deg 90deg 105%' 等效 -->
           <iframe
             class="nbmv__frame"
-            src="/static/model3d/index.html?modelurl=%2Fstatic%2Fmodel3d%2Fmodel.gltf&applytexture=1&rot=1&delay=500&speed=200%25&orbit=0deg%2090deg%20105%25&autofront=1&touch=1"
+            src="/static/model3d/index.html?modelurl=%2Fstatic%2Fmodel3d%2Fmodel.gltf&applytexture=1&rot=1&delay=500&speed=200%25&autofront=1&touch=1"
             frameborder="0"
             allowfullscreen
           ></iframe>

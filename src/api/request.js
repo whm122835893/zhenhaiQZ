@@ -63,14 +63,18 @@ function resolveBaseUrl() {
   const injected = import.meta.env && import.meta.env.VITE_API_BASE
   if (injected) return String(injected).replace(/\/+$/, '')
 
-  // 3. 默认：开发走本地后端（经 vite 代理），生产直连
-  return import.meta.env && import.meta.env.DEV ? LOCAL_API : SOURCE_API
+  // 3. 默认：始终同源 /api（dev 走 vite 代理，生产由 nginx 反代到后端）。
+  //    不再默认直连源站 —— 源站不是本项目的一部分，静默外联属于潜在故障源；
+  //    需要对比源站时用控制台 shengtaiApi.useSource() 显式切换。
+  return LOCAL_API
 }
 
 export const BASE_URL = resolveBaseUrl()
 
-export const FRONT_URL = 'https://h5.shengtai.cyou'
-export const WSS_URL = 'wss://im.shengtai.cyou/ws'
+/** 本站根地址：邀请链接、协议页等站内绝对链接都拼在当前 origin 上，
+ *  不再指向源站（源站地址仅在调试常量里保留） */
+export const FRONT_URL = window.location.origin
+export const WSS_URL = 'wss://im.shengtai.cyou/ws' // 遗留常量，暂无调用方；IM 服务自建后替换
 export const APP_NAME = '臻海艺术'
 
 /** 当前是否连本地后端（调试用：控制台 shengtaiApi.isLocal()） */

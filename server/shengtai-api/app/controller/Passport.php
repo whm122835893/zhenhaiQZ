@@ -45,9 +45,12 @@ class Passport extends Base
 
         $plain = $this->decryptPassword($encrypted);
 
-        $user = User::where('account', $account)
-            ->orWhere('phone', $account)
-            ->where('is_deleted', 0)
+        // (account = X OR phone = X) AND is_deleted = 0
+        // 闭包保证 OR 不与外层 is_deleted 条件发生优先级错配
+        $user = User::where('is_deleted', 0)
+            ->where(function ($query) use ($account) {
+                $query->where('account', $account)->whereOr('phone', $account);
+            })
             ->find();
 
         if ($user === null || !$user->has_password) {

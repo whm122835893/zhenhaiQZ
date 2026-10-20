@@ -32,8 +32,11 @@ const detail = ref({ ...MOCK })
 const avatarSrc = computed(() => {
   const a = detail.value.avatar
   if (!a) return defaultLogo
-  if (/^https?:\/\//.test(a) || a.indexOf('/static') === 0) return a
-  return 'https://api.hainanchaowan.cn' + (a.charAt(0) === '/' ? a : '/' + a)
+  // 站内资源一律同源加载：根相对路径（/media/...）、无协议相对路径、
+  // data:/blob: 直接放行；裸相对路径（media/...）补前导斜杠。
+  // 不再把站内路径拼到外部主机（原站拼 api.hainanchaowan.cn，该域名非本项目资源）。
+  if (/^(https?:)?\/\//i.test(a) || /^(data|blob):/i.test(a)) return a
+  return a.charAt(0) === '/' ? a : '/' + a
 })
 
 onMounted(async () => {

@@ -75,10 +75,12 @@ const cssHeight = computed(() => (Number.isNaN(Number(props.height)) ? 300 : Num
 const progressText = computed(() => Math.min(99, Math.round(100 * (progress.value || 0))))
 const posterSrc = computed(() => props.poster || props.textureUrl || '')
 
-/** 绝对化：协议相对 // 与 data:/blob: 直接放行 */
+/** 绝对化：协议相对 // 与 data:/blob: 直接放行；站内根相对路径（/media/...）
+ *  也放行 —— iframe 与主页面同源，相对路径在网关环境下反而更可靠 */
 function absUrl(u) {
   if (!u) return ''
-  return /^(https?:)?\/\//i.test(u) || /^(data|blob):/i.test(u) ? u : ''
+  if (/^(https?:)?\/\//i.test(u) || /^(data|blob):/i.test(u)) return u
+  return u.startsWith('/') ? u : ''
 }
 
 const resolvedViewerPath = computed(() => {
@@ -102,7 +104,9 @@ const frameUrl = computed(() => {
   q.push('rot=' + (props.autoRotate ? '1' : '0'))
   q.push('delay=' + props.rotateDelay)
   q.push('speed=' + encodeURIComponent(props.rotationPerSecond))
-  q.push('orbit=' + encodeURIComponent(props.cameraOrbit))
+  // ⚠️ 不传 orbit：值含编码后的 %（105%25），预览网关二次解码出现裸 %，
+  // 导致网关无法构建上游请求（iframe 收到 {"error":"failed to build request"}）。
+  // 组件默认 '0deg 90deg 105%' 与 index.html 内置默认一致，省略即等效。
   q.push('autofront=' + (props.autoFront ? '1' : '0'))
   q.push('touch=' + (props.disableInteraction ? '0' : '1'))
   if (props.background) q.push('bg=' + encodeURIComponent(props.background))

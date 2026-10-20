@@ -122,10 +122,12 @@ function copyInviteCode() {
   copy(profile.value.inviteCode)
 }
 
-/** 原站 copyInviteUrl()：拼接带 inviteCode 的注册链接 */
+/** 原站 copyInviteUrl()：拼接带 inviteCode 的注册链接
+ *  本项目为 hash 路由（createWebHashHistory），站内绝对链接需带 /#/ 前缀，
+ *  否则复制出去的链接打开后落到首页而非注册页 */
 function copyInviteUrl() {
   if (!profile.value.inviteCode) return showToast('请先登录')
-  copy(FRONT_URL + '/pages/authorize/signup?inviteCode=' + profile.value.inviteCode)
+  copy(FRONT_URL + '/#/pages/authorize/signup?inviteCode=' + profile.value.inviteCode)
 }
 
 /** 原站 getInviteList(e, t)：e=isRefresh，t=isAppend；userApi.listInvite → GET /user/invite */
