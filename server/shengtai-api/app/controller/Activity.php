@@ -292,9 +292,9 @@ class Activity extends Base
         $signDays[] = $day;
         sort($signDays);
 
-        // 奖励积分：连续签到递增（1/2/3/5/7 天封顶）
-        $rewardMap = [1 => 1, 2 => 2, 3 => 3, 4 => 5, 5 => 7];
-        $reward = $rewardMap[$continuous] ?? 7;
+        // 奖励积分：连续签到递增（活动运营后台可配 activity.sign_rewards，CSV）
+        $rewards = self::signRewardTiers();
+        $reward  = $rewards[$continuous - 1] ?? end($rewards);
 
         ActivitySignRecord::create([
             'uid'            => $uid,
@@ -304,16 +304,40 @@ class Activity extends Base
             'sign_days'      => count($signDays),
             'continuous_days'=> $continuous,
             'reward_points'  => $reward,
-            'sign_time'      => $now,
+            'sign_time'      => date('Y-m-d H:i:s', intdiv($now, 1000)),
         ]);
 
         $this->addPoints($uid, $reward, 'sign', '', '每日签到奖励');
+
+        // 签到里程碑空投：连续签到达配置天数 → 直接发藏品（每档每用户仅一次，失败不阻断签到）
+        $airdrops = [];
+        foreach (self::signMilestones() as $m) {
+            if ($continuous !== $m['day']) {
+                continue;
+            }
+            try {
+                $g = \app\service\GrantService::grantDirect(
+                    $uid, $m['iid'], $m['qty'],
+                    'sign_milestone', 'u' . $uid . ':m' . $m['day']
+                );
+                if ($g['itemName'] !== '') {
+                    $airdrops[] = [
+                        'day'      => $m['day'],
+                        'itemName' => $g['itemName'],
+                        'quantity' => count($g['itemIds']),
+                        'nftIds'   => $g['itemIds'],
+                    ];
+                }
+            } catch (\Throwable) {
+            }
+        }
 
         return [
             'signDay'        => $day,
             'signDays'       => count($signDays),
             'continuousDays' => $continuous,
             'rewardPoints'   => $reward,
+            'airdrops'       => $airdrops,
             'records'        => $this->buildSignRecords($signDays),
         ];
     }
@@ -363,13 +387,13 @@ class Activity extends Base
             throw ApiException::system('积分不足');
         }
 
-        // 按概率抽 prize
+        // 按概率抽 prize（probability 列为百分比语义：43.00 = 43%）
         $prizes = ActivityLotteryPrize::where('lottery_id', $id)->select()->toArray();
         if ($prizes === []) {
             throw ApiException::notFound();
         }
 
-        $roll   = random_int(1, 10000);
+        $roll   = random_int(1, 100);
         $acc    = 0;
         $hitPrize = null;
         foreach ($prizes as $p) {
@@ -545,6 +569,41 @@ class Activity extends Base
     }
 
     /**
+     * 签到奖励档位（第 1..N 天连续签到各得多少积分）
+     * 配置键 activity.sign_rewards，CSV，如 "1,2,3,5,7"；超过档位数取最后一档。
+     */
+    private static function signRewardTiers(): array
+    {
+        $csv = \app\service\SystemConfigService::get('activity.sign_rewards', '1,2,3,5,7');
+        $tiers = array_values(array_filter(array_map('intval', explode(',', $csv)), static fn ($v) => $v > 0));
+        return $tiers === [] ? [1, 2, 3, 5, 7] : $tiers;
+    }
+
+    /**
+     * 签到里程碑空投配置。
+     * 配置键 activity.sign_milestones，CSV「连续天数:items.id:数量」，如 "3:12:1,7:15:1"。
+     * 语义：连续签到恰好达第 N 天当天空投对应藏品；biz_key=u{uid}:m{day}，每档每用户仅发一次。
+     */
+    private static function signMilestones(): array
+    {
+        $csv = \app\service\SystemConfigService::get('activity.sign_milestones', '');
+        $out = [];
+        foreach (explode(',', $csv) as $seg) {
+            $p = explode(':', trim($seg));
+            if (count($p) !== 3) {
+                continue;
+            }
+            $day = (int)$p[0];
+            $iid = (int)$p[1];
+            $qty = (int)$p[2];
+            if ($day > 0 && $iid > 0 && $qty > 0) {
+                $out[] = ['day' => $day, 'iid' => $iid, 'qty' => $qty];
+            }
+        }
+        return $out;
+    }
+
+    /**
      * 记一笔积分流水并更新余额快照
      */
     private function addPoints(string $uid, int $change, string $bizType, string $bizId, string $remark): void
@@ -556,7 +615,8 @@ class Activity extends Base
             'change_points' => $change,
             'balance_after' => $balanceAfter,
             'biz_type'      => $bizType,
-            'biz_id'        => $bizId,
+            // biz_id 为 bigint：签到等无关联业务传 0，非空时取整
+            'biz_id'        => $bizId === '' ? 0 : (int)$bizId,
             'remark'        => $remark,
         ]);
     }

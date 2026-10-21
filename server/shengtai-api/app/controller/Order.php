@@ -192,7 +192,7 @@ class Order extends Base
             'subject'        => $item['name'],
             'out_trade_no'   => 'ST' . $now . random_int(1000, 9999),
             'is_snap_up'     => false,
-            'end_pay_time'   => $now + (int)config('shengtai.order.pay_window_ms'),
+            'end_pay_time'   => $now + (int)\app\service\SystemConfigService::int('order.pay_window_ms', (int)config('shengtai.order.pay_window_ms')),
             'pay_time'       => 0,
             'cancelled_at'   => 0,
             'created_ts'     => $now,
@@ -244,17 +244,17 @@ class Order extends Base
             'subject'       => $nft['name'],
             'out_trade_no'  => 'ST' . $now . random_int(1000, 9999),
             'seller_uid'    => (string)$nft['uid'],
-            'end_pay_time'  => $now + (int)config('shengtai.order.pay_window_ms'),
+            'end_pay_time'  => $now + (int)\app\service\SystemConfigService::int('order.pay_window_ms', (int)config('shengtai.order.pay_window_ms')),
             'pay_time'      => 0,
             'cancelled_at'  => 0,
             'created_ts'    => $now,
         ]);
 
-        // 二级市场下单要锁单：把 nft 标为锁定 + 待售
+        // 二级市场下单要锁单：锁定语义由 pay_lock + sell_status 表达，
+        // nfts.status 是 tinyint 数字枚举（0=普通 1=在售 2=已售），不能写字符串
         \app\model\Nft::where('id', $nft['id'])->update([
             'pay_lock'     => 1,
             'sell_status'  => 2,
-            'status'       => 'locked',
         ]);
 
         OrderItem::create([
@@ -349,7 +349,7 @@ class Order extends Base
                 'subject'       => $nft['name'],
                 'out_trade_no'  => 'ST' . $now . random_int(1000, 9999),
                 'seller_uid'    => (string)$nft['uid'],
-                'end_pay_time'  => $now + (int)config('shengtai.order.pay_window_ms'),
+                'end_pay_time'  => $now + (int)\app\service\SystemConfigService::int('order.pay_window_ms', (int)config('shengtai.order.pay_window_ms')),
                 'pay_time'      => 0,
                 'cancelled_at'  => 0,
                 'created_ts'    => $now,
@@ -364,10 +364,10 @@ class Order extends Base
                 'created_ts' => $now,
             ]);
 
+            // nfts.status 是 tinyint 数字枚举，锁定语义由 pay_lock/sell_status 表达
             \app\model\Nft::where('id', $nft['id'])->update([
                 'pay_lock'    => 1,
                 'sell_status' => 2,
-                'status'      => 'locked',
             ]);
 
             $ids[] = (string)$order->id;
@@ -417,7 +417,7 @@ class Order extends Base
             'amount'        => $amount,
             'subject'       => $item['name'],
             'out_trade_no'  => 'ST' . $now . random_int(1000, 9999),
-            'end_pay_time'  => $now + (int)config('shengtai.order.pay_window_ms'),
+            'end_pay_time'  => $now + (int)\app\service\SystemConfigService::int('order.pay_window_ms', (int)config('shengtai.order.pay_window_ms')),
             'pay_time'      => 0,
             'cancelled_at'  => 0,
             'created_ts'    => $now,
@@ -500,7 +500,7 @@ class Order extends Base
             \app\model\Nft::where('nft_id', $it['nft_id'])->update([
                 'pay_lock'    => 0,
                 'sell_status' => 0,
-                'status'      => 'normal',
+                'status'      => 0,
             ]);
         }
 

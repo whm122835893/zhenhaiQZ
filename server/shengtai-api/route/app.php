@@ -56,6 +56,7 @@ Route::group(function () {
 
     /* ---------- 基础内容 ---------- */
     Route::get('basic/banner', 'Basic/banner');
+    Route::get('basic/configs', 'Basic/configs');
     Route::get('basic/notice', 'Basic/noticeList');
     Route::get('basic/notice/category', 'Basic/noticeCategory');
     Route::get('basic/notice/:id', 'Basic/noticeDetail');
@@ -141,6 +142,9 @@ Route::group(function () {
     Route::post('activity/recast/draw', 'Activity/recastDraw');
     Route::post('nft/merge/v1', 'Nft/merge');
     Route::post('ai/answer/get_answer', 'Ai/answer');
+
+    /* ---------- 定向发放（C 端只读） ---------- */
+    Route::get('grant/my', 'Grant/my');
 
     /* ---------- 钱包充值 ---------- */
     Route::get('wallet/hfpay', 'Wallet/hfpay');

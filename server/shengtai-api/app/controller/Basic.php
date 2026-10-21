@@ -26,6 +26,17 @@ use app\service\Transformer;
 class Basic extends Base
 {
     /**
+     * GET /basic/configs —— 运营参数（吸收司南 system_configs 规范）
+     *
+     * 运营参数落库 system_configs，运行时可改、禁硬编码；
+     * 该端点只吐非敏感参数（费率/窗口/限购等），供前端展示与联调核对。
+     */
+    public function configs()
+    {
+        return ['list' => \app\service\SystemConfigService::all()];
+    }
+
+    /**
      * GET /basic/banner —— 首页轮播
      *
      * 源站按 position 分区返回；不传position 时返回全部启用中的。

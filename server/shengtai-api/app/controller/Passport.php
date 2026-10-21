@@ -128,7 +128,56 @@ class Passport extends Base
             'updated_at' => $now,
         ]);
 
+        // 邀请闭环：携带 inviter（邀请码）则落 user_invites，失败不阻断注册
+        $this->bindInviter($user->id, trim((string)($body['inviter'] ?? '')), $now);
+
+        // 新人定向发放（事件驱动）：失败不阻断注册主流程
+        try {
+            \app\service\GrantService::onUserRegistered((string)$user->id);
+        } catch (\Throwable) {
+        }
+
+        // 邀请奖励结算（时机=注册即发 时在此发放；失败不阻断注册）
+        try {
+            \app\service\InviteService::onRegistered((string)$user->id);
+        } catch (\Throwable) {
+        }
+
         return $this->issueLogin($user, 2);
+    }
+
+    /**
+     * 绑定邀请关系：按邀请码找邀请人，写 user_invites（reward_status=pending）。
+     * 奖励为藏品（invite.reward_iid/qty），由 InviteService 按结算时机发放。
+     */
+    private function bindInviter(string $inviteeUid, string $code, string $now): void
+    {
+        try {
+            if ($code === '') {
+                return;
+            }
+            $inviter = UserProfile::where('invite_code', strtoupper($code))->find();
+            if (!$inviter || (string)$inviter->uid === $inviteeUid) {
+                return;
+            }
+            // 同一被邀请人只允许一条记录（幂等）
+            if (Db::name('user_invites')->where('invitee_uid', $inviteeUid)->count() > 0) {
+                return;
+            }
+
+            Db::name('user_invites')->insert([
+                'id'            => Snowflake::nextIdStr(),
+                'uid'           => (string)$inviter->uid,
+                'invitee_uid'   => $inviteeUid,
+                'invite_code'   => strtoupper($code),
+                'reward_amount' => 0,
+                'reward_status' => 'pending',
+                'created_at'    => $now,
+                'updated_at'    => $now,
+            ]);
+        } catch (\Throwable) {
+            // 邀请绑定失败不影响注册主流程
+        }
     }
 
     /**
@@ -169,6 +218,12 @@ class Passport extends Base
                 'id' => Snowflake::nextIdStr(), 'uid' => $user->id,
                 'balance' => 0, 'created_at' => $now, 'updated_at' => $now,
             ]);
+
+            // 新人定向发放（快捷登录自动注册路径，失败不阻断）
+            try {
+                \app\service\GrantService::onUserRegistered((string)$user->id);
+            } catch (\Throwable) {
+            }
         }
 
         return $this->issueLogin($user, 2);

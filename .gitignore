@@ -36,6 +36,9 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+# API 静态根指向仓库根 public/media 的本地软链（环境产物，不入库）
+server/shengtai-api/public/media
+
 # 源站 API 审计脚本的 chunk 缓存（96 个分包，可随时重新抓取）
 .cache/
 

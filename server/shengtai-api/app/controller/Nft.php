@@ -30,12 +30,12 @@ use app\service\Transformer;
  *  - 二级市场统计字段单位混用：minPrice/maxPrice 用「分」，
  *    而 item.price 用「元」，todayTradeAmount 也是「分」
  *  - GET /nft/secondary/sold 的成交记录只有 5 个字段（见 Transformer::tradeLog）
- *  - nfts.status 在库里是字符串枚举（normal/locked/sold），
- *    但 Transformer::nft() 输出时转成 int —— 这里保持源站行为
+ *  - nfts.status 在库里是 tinyint 数字枚举（0=普通 1=在售/挂单中 2=已售），
+ *    Transformer::nft() 输出时也是 int —— 这里保持源站行为
  */
 class Nft extends Base
 {
-    /** nfts.status 字符串枚举 → 源站输出的数字 */
+    /** 旧字符串枚举兜底映射（读侧兼容） */
     private const STATUS_MAP = [
         'normal' => 0,
         'locked' => 1,
@@ -453,6 +453,28 @@ class Nft extends Base
             throw ApiException::notFound();
         }
 
+        // 藏品级寄售开关（管理端 items.is_secondary）：关 = 该藏品禁止寄售
+        $item = \app\model\Item::where('iid', $nft['iid'])->where('is_deleted', 0)->find();
+        if (!$item || (int)$item['is_secondary'] !== 1) {
+            throw new ApiException('该藏品未开放寄售', ApiException::CODE_SYSTEM_ERROR);
+        }
+
+        // 冷却检查（吸收司南 v2.2 #15：寄售冷却落库，参数 system_configs.sell.cooldown_minutes）
+        $nowMs = (int)round(microtime(true) * 1000);
+        $cooldown = (int)NftSellOrder::where('uid', $uid)
+            ->where('cooldown_until', '>', $nowMs)
+            ->max('cooldown_until');
+        if ($cooldown > $nowMs) {
+            throw new ApiException(
+                '寄售冷却中，请 ' . (int)ceil(($cooldown - $nowMs) / 60000) . ' 分钟后再试',
+                ApiException::CODE_SYSTEM_ERROR
+            );
+        }
+
+        // 手续费快照（费率 system_configs.sell.fee_rate）
+        $feeRate = \app\service\SystemConfigService::float('sell.fee_rate', 0.0);
+        $feeAmount = round($price * $feeRate, 2);
+
         NftSellOrder::create([
             'nft_id'        => $nftId,
             'iid'           => $nft['iid'],
@@ -463,7 +485,11 @@ class Nft extends Base
             'market_type'   => (int)($body['marketType'] ?? 1),
             'status'        => 1,
             'sold_at'       => 0,
-            'buyer_uid'     => '',
+            'buyer_uid'     => 0,
+            'fee_rate'      => $feeRate,
+            'fee_amount'    => $feeAmount,
+            'actual_amount' => round($price - $feeAmount, 2),
+            'cooldown_until'=> 0,
         ]);
 
         NftModel::where('id', $nft['id'])->update([
@@ -496,6 +522,22 @@ class Nft extends Base
             throw ApiException::paramType('pricemust be number');
         }
 
+        // 冷却检查（同单件上架，批量只查一次）
+        $nowMs = (int)round(microtime(true) * 1000);
+        $cooldown = (int)NftSellOrder::where('uid', $uid)
+            ->where('cooldown_until', '>', $nowMs)
+            ->max('cooldown_until');
+        if ($cooldown > $nowMs) {
+            throw new ApiException(
+                '寄售冷却中，请 ' . (int)ceil(($cooldown - $nowMs) / 60000) . ' 分钟后再试',
+                ApiException::CODE_SYSTEM_ERROR
+            );
+        }
+
+        // 手续费快照（费率 system_configs.sell.fee_rate）
+        $feeRate = \app\service\SystemConfigService::float('sell.fee_rate', 0.0);
+        $feeAmount = round($price * $feeRate, 2);
+
         $success = [];
 
         foreach ($nftIds as $nftId) {
@@ -510,6 +552,12 @@ class Nft extends Base
                 continue;
             }
 
+            // 藏品级寄售开关（同单件上架）：未开放寄售的藏品跳过
+            $item = \app\model\Item::where('iid', $nft['iid'])->where('is_deleted', 0)->find();
+            if (!$item || (int)$item['is_secondary'] !== 1) {
+                continue;
+            }
+
             NftSellOrder::create([
                 'nft_id'        => $nftId,
                 'iid'           => $nft['iid'],
@@ -520,7 +568,11 @@ class Nft extends Base
                 'market_type'   => (int)($body['marketType'] ?? 1),
                 'status'        => 1,
                 'sold_at'       => 0,
-                'buyer_uid'     => '',
+                'buyer_uid'     => 0,
+                'fee_rate'      => $feeRate,
+                'fee_amount'    => $feeAmount,
+                'actual_amount' => round($price - $feeAmount, 2),
+                'cooldown_until'=> 0,
             ]);
 
             NftModel::where('id', $nft['id'])->update([
@@ -720,7 +772,7 @@ class Nft extends Base
                     'image'           => $p['image'],
                     'image_url'       => $p['image_url'],
                     'token'           => 1,
-                    'status'          => 'normal',
+                    'status'          => 0, // nfts.status 是 tinyint 数字枚举 0=普通
                     'get_time'        => $this->nowMillis(),
                     'price'           => 0,
                     'buy_price'       => 0,
@@ -754,12 +806,16 @@ class Nft extends Base
      * ================================================================== */
 
     /**
-     * nfts.status 是字符串枚举，Transformer 输出时需要数字
+     * nfts.status 归一化为源站输出的数字。
+     * 库里是 tinyint 数字枚举（0=普通 1=在售/挂单中 2=已售），
+     * 字符串值（normal/locked/sold）按旧映射兜底。
      */
     private static function normalizeNft(array $row): array
     {
-        $status = (string)($row['status'] ?? 'normal');
-        $row['status'] = self::STATUS_MAP[$status] ?? 0;
+        $status = $row['status'] ?? 0;
+        $row['status'] = is_numeric($status)
+            ? (int)$status
+            : (self::STATUS_MAP[(string)$status] ?? 0);
         return $row;
     }
 

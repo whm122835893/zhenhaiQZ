@@ -667,6 +667,7 @@ CREATE TABLE `notice_categories` (
   `cover`      varchar(255) NOT NULL DEFAULT '',
   `cover_url`  varchar(512) NOT NULL DEFAULT '',
   `sort`       int NOT NULL DEFAULT 0,
+  `is_deleted` tinyint NOT NULL DEFAULT 0 COMMENT '软删：0正常 1删除',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -953,3 +954,5 @@ INSERT INTO `common_rules` (`id`, `rule_key`, `title`, `version`) VALUES
 
 INSERT INTO `app_versions` (`id`, `platform`, `version`, `min_version`, `force_update`, `description`) VALUES
   (1, 'web', '1.3.2', '1.0.0', 0, '当前版本');
+
+-- >>> absorb v1（见 migration_absorb_v1.sql / seed_absorb_data.sql）
