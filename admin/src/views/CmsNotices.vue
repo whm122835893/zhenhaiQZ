@@ -58,7 +58,7 @@
             <label>分类</label>
             <select v-model="form.cid" class="select" style="width:100%">
               <option value="0">未分类</option>
-              <option v-for="c in cats" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
+              <option v-for="c in cats" :key="c.cid" :value="String(c.cid)">{{ c.name }}</option>
             </select>
           </div>
           <div class="checks" style="align-items:flex-end;padding-bottom:7px">
@@ -201,7 +201,7 @@ async function loadItems() {
 }
 
 function catName(cid) {
-  return String(cats.value.find(c => String(c.id) === String(cid))?.name || '')
+  return String(cats.value.find(c => String(c.cid) === String(cid))?.name || '')
 }
 
 // C 端详情页对正文所有 img 注入 width:100%，预览保持同一处理
@@ -276,7 +276,9 @@ async function save() {
   try {
     const payload = {
       title: form.title,
-      cid: Number(form.cid) || 0,
+      // ⚠️ cid 是雪花 ID，必须以字符串提交（Number 会精度丢失）；
+      // 后端按 notice_categories.cid 校验
+      cid: form.cid || '0',
       cover: form.cover,
       isTop: !!form.isTop,
       content: form.content,

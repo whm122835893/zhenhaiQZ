@@ -16,14 +16,31 @@ echo "[1/3] MariaDB"
 if mysqladmin ping >/dev/null 2>&1; then
   ok "已在运行"
 else
-  # 沙箱休眠后 mysqld 进程消失，但数据目录完好，直接拉起即可
+  # 沙箱休眠后 mysqld 进程消失，但数据目录完好，直接拉起即可。
+  # ⚠️ root 环境下 mysqld_safe 可能静默退出（拒绝 root 运行），失败后用 mariadbd --user=root 直启兜底
   ( mysqld_safe >/tmp/mysqld_safe.log 2>&1 & )
-  for i in $(seq 1 30); do
+  for i in $(seq 1 15); do
     mysqladmin ping >/dev/null 2>&1 && break
     sleep 1
   done
-  mysqladmin ping >/dev/null 2>&1 && ok "已启动" || warn "启动失败，见 /tmp/mysqld_safe.log"
+  if ! mysqladmin ping >/dev/null 2>&1; then
+    ( setsid nohup mariadbd --user=root >/tmp/mariadbd.log 2>&1 </dev/null & )
+    for i in $(seq 1 20); do
+      mysqladmin ping >/dev/null 2>&1 && break
+      sleep 1
+    done
+  fi
+  mysqladmin ping >/dev/null 2>&1 && ok "已启动" || warn "启动失败，见 /tmp/mariadbd.log 与 /tmp/mysqld_safe.log"
 fi
+
+# 沙箱重装 MariaDB 后应用账号会丢失，这里幂等重建（.env: DB_USER/DB_PASS）
+mysql -uroot <<'SQL' >/dev/null 2>&1 || warn "shengtai 账号重建失败（root 权限?）"
+CREATE USER IF NOT EXISTS 'shengtai'@'localhost' IDENTIFIED BY 'shengtai123';
+CREATE USER IF NOT EXISTS 'shengtai'@'127.0.0.1' IDENTIFIED BY 'shengtai123';
+GRANT ALL PRIVILEGES ON shengtai.* TO 'shengtai'@'localhost';
+GRANT ALL PRIVILEGES ON shengtai.* TO 'shengtai'@'127.0.0.1';
+FLUSH PRIVILEGES;
+SQL
 
 echo "[2/3] ThinkPHP 后端 :8921"
 if curl -s -m 3 -o /dev/null "http://127.0.0.1:8921/item/2109928427009183745" 2>/dev/null; then

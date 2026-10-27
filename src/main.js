@@ -16,7 +16,7 @@ import './styles/global.css'
    此处按实际使用范围注册，未使用的组件不引入，避免拖大包体。 */
 import { Popup as VanPopup, Icon as VanIcon } from 'vant'
 
-import { BASE_URL, isLocalApi, switchApi } from './api/request'
+import { BASE_URL, isLocalApi, switchApi, loadBrand } from './api/request'
 
 /* 后端调试开关（仅开发环境挂到 window，生产构建被静态剔除）
  *
@@ -51,3 +51,6 @@ app.component('van-icon', VanIcon)
 app.use(createPinia())
 app.use(router)
 app.mount('#app')
+
+// 平台品牌动态化：启动即拉（首页 logo 字、关于页、证书、协议、标题栏等展示位）
+loadBrand()

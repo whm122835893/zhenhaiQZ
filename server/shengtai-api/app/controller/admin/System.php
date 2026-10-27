@@ -42,11 +42,21 @@ class System extends AdminBase
                 continue;
             }
             $row = \think\facade\Db::name('system_configs')->where('config_key', $key)->where('is_deleted', 0)->find();
-            if (!$row || (string)$row['config_value'] === $value) {
-                continue;
+            if ($row) {
+                if ((string)$row['config_value'] === $value) {
+                    continue;
+                }
+                \think\facade\Db::name('system_configs')->where('id', (int)$row['id'])->update(['config_value' => $value]);
+                $changed[] = ['key' => $key, 'from' => (string)$row['config_value'], 'to' => $value];
+            } else {
+                // 新键 upsert：首次保存品牌等未预置的配置项时直接插入，避免静默丢失
+                \think\facade\Db::name('system_configs')->insert([
+                    'config_key'   => $key,
+                    'config_value' => $value,
+                    'remark'       => '',
+                ]);
+                $changed[] = ['key' => $key, 'from' => null, 'to' => $value];
             }
-            \think\facade\Db::name('system_configs')->where('id', (int)$row['id'])->update(['config_value' => $value]);
-            $changed[] = ['key' => $key, 'from' => (string)$row['config_value'], 'to' => $value];
         }
 
         if ($changed !== []) {

@@ -93,7 +93,7 @@
             @click="toggleAgreement"
           />
           <span style="font-size: 12px; color: rgb(61, 75, 102); margin-left: 0.375rem">
-            我已同意臻海艺术平台
+            我已同意{{ brand.name }}平台
           </span>
           <span class="link" @click="navigateToService">《服务协议》</span>
           <span class="link" @click="navigateToPrivacy">《隐私政策》</span>
@@ -116,6 +116,7 @@ import UvIcon from '@/components/UvIcon.vue'
 import { passportApi } from '@/api'
 import { encryptPassword } from '@/utils/crypto'
 import { showLoading, hideLoading } from '@/api/request'
+import { brand } from '@/api/request'
 
 import bgImg from '@/assets/signup/bg.jpg'
 import backImg from '@/assets/signup/back.png'

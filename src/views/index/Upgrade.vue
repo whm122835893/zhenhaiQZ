@@ -24,7 +24,7 @@
         <div class="um-banner">
           <div class="um-banner-title">
             <span class="um-banner-zh">发现</span>
-            <span class="um-badge">臻海艺术</span>
+            <span class="um-badge">{{ brand.name }}</span>
           </div>
           <div class="um-banner-sub">
             <span class="um-sub-txt">新版本啦</span>
@@ -58,6 +58,7 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
+import { brand } from '@/api/request'
 import rocket from '@/assets/p0final/upgrade/rocket.webp'
 
 const router = useRouter()

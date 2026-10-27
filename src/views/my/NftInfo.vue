@@ -52,7 +52,7 @@
         </div>
         <div class="cert-box">
           <div class="cert-star"></div>
-          <span class="cert-key">臻海艺术 数字藏品</span>
+          <span class="cert-key">{{ brand.name }} 数字藏品</span>
           <span class="cert-val">数字资产存证证书 &gt;&gt;</span>
         </div>
       </div>
@@ -60,8 +60,8 @@
       <div class="pro-info-box">
         <div class="brand-row">
           <div class="brand-left">
-            <img :src="logoImg" class="brand-logo" alt="" />
-            <span class="brand-name">臻海艺术</span>
+            <img :src="brand.logo || logoImg" class="brand-logo" alt="" />
+            <span class="brand-name">{{ brand.name }}</span>
           </div>
           <span class="brand-action">品牌方 &gt;</span>
         </div>
@@ -81,16 +81,16 @@
         <div class="key-val-row">
           <span class="kv-key">品牌方</span>
           <span class="kv-val-wrap">
-            <img :src="logoImg" class="kv-logo" alt="" />
-            <span class="kv-val">臻海艺术</span>
+            <img :src="brand.logo || logoImg" class="kv-logo" alt="" />
+            <span class="kv-val">{{ brand.name }}</span>
           </span>
         </div>
 
         <div class="key-val-row">
           <span class="kv-key">创作者</span>
           <span class="kv-val-wrap">
-            <img :src="logoImg" class="kv-logo" alt="" />
-            <span class="kv-val">臻海艺术</span>
+            <img :src="brand.logo || logoImg" class="kv-logo" alt="" />
+            <span class="kv-val">{{ brand.name }}</span>
           </span>
         </div>
       </div>
@@ -116,8 +116,8 @@
         <div v-if="activeTab === 'intro'" class="intro-body">
           <div class="user-row">
             <div class="user-left">
-              <img :src="logoImg" class="user-logo" alt="" />
-              <span class="user-name">臻海艺术</span>
+              <img :src="brand.logo || logoImg" class="user-logo" alt="" />
+              <span class="user-name">{{ brand.name }}</span>
             </div>
             <span class="user-role">品牌方/创作者</span>
           </div>
@@ -257,6 +257,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { nftApi } from '@/api'
 import { showLoading, hideLoading } from '@/api/request'
+import { brand } from '@/api/request'
 import { chainFormat as fmtChainFormat } from '@/utils/fmt'
 import { storage, BG_IMG_KEY } from '@/utils/storage'
 import { encryptPassword } from '@/utils/crypto'

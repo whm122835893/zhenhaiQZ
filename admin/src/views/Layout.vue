@@ -7,9 +7,10 @@
              stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></svg>
       </button>
       <div class="brand">
-        <div class="brand-logo">臻</div>
+        <img v-if="brand.logo" class="brand-logo" :src="brand.logo" alt="logo" style="object-fit:cover" />
+        <div v-else class="brand-logo">{{ brand.name.slice(0, 1) }}</div>
         <div class="brand-txt">
-          <div class="brand-name">臻海艺术</div>
+          <div class="brand-name">{{ brand.name }}</div>
           <div class="brand-sub">ADMIN CONSOLE</div>
         </div>
       </div>
@@ -89,7 +90,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import http, { toast, getProfile, setProfile, clearAuth, bindKick, canWrite } from '../api'
+import http, { toast, getProfile, setProfile, clearAuth, bindKick, canWrite, brand } from '../api'
 
 const route = useRoute()
 const router = useRouter()
@@ -115,6 +116,7 @@ const nav = [
       { path: '/users', text: '用户管理', icon: 'users' },
       { path: '/wallet', text: '钱包流水', icon: 'wallet' },
       { path: '/items', text: '藏品管理', icon: 'gem' },
+      { path: '/categories', text: '分类管理', icon: 'grid' },
       { path: '/orders', text: '订单管理', icon: 'receipt' },
       { path: '/market', text: '市场寄售', icon: 'store' },
       { path: '/nfts', text: '持仓查询', icon: 'cube' },
@@ -140,6 +142,7 @@ const nav = [
     label: '系统',
     items: [
       { path: '/system/configs', text: '运营参数', icon: 'sliders' },
+      { path: '/system/cleanup', text: '数据清理', icon: 'trash' },
       { path: '/system/logs', text: '日志审计', icon: 'shield' },
     ],
   },
@@ -150,6 +153,7 @@ const icons = {
   wallet: '<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H18a1 1 0 0 1 1 1v2"/><path d="M3 7.5V17a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H5.5A2.5 2.5 0 0 1 3 7.5Z"/><circle cx="16.5" cy="14" r="1.2" fill="currentColor" stroke="none"/>',
   users: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.6-3.2 2.9-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M16 15.2c2.3.2 4 1.7 4.5 4.3"/>',
   gem: '<path d="M7 3h10l4 6-9 12L3 9l4-6z"/><path d="M3 9h18M12 21 8.5 9 12 3l3.5 6L12 21"/>',
+  grid: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
   receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z"/><path d="M9 8h6M9 12h6"/>',
   store: '<path d="M4 9 5.5 4h13L20 9"/><path d="M4 9a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0"/><path d="M5 11v9h14v-9M10 20v-5h4v5"/>',
   cube: '<path d="m12 2 8 4.5v9L12 22l-8-6.5v-9L12 2z"/><path d="m4 6.5 8 5 8-5M12 11.5V22"/>',
@@ -158,6 +162,7 @@ const icons = {
   image: '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m5 18 5-5 3 3 3-3 3 3"/>',
   sliders: '<path d="M5 4v6M5 14v6M12 4v10M12 18v2M19 4v2M19 10v10"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="16" r="2"/><circle cx="19" cy="8" r="2"/>',
   shield: '<path d="M12 2 4.5 5v6c0 5 3.2 8.6 7.5 10 4.3-1.4 7.5-5 7.5-10V5L12 2z"/><path d="m9 11.5 2 2 4-4.5"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>',
   gift: '<rect x="3" y="9" width="18" height="4" rx="1"/><path d="M5 13v8h14v-8M12 9v12M12 9s-4.5.2-4.5-2.5C7.5 4.6 9 4 10 4.4c1.6.6 2 4.6 2 4.6s.4-4 2-4.6c1-.4 2.5.2 2.5 2.1C16.5 9.2 12 9 12 9z"/>',
   merge: '<path d="M7 4h6a4 4 0 0 1 4 4v0a4 4 0 0 1-4 4H7"/><path d="m10 9-3 3 3 3"/><path d="M17 12v8M14 17l3 3 3-3"/>',
   heart: '<path d="M12 20.5S4 15.5 4 9.9C4 7.2 6.1 5 8.8 5c1.3 0 2.5.6 3.2 1.6A4 4 0 0 1 15.2 5C17.9 5 20 7.2 20 9.9c0 5.6-8 10.6-8 10.6z"/>',

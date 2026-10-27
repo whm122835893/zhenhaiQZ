@@ -37,6 +37,25 @@ class Basic extends Base
     }
 
     /**
+     * GET /basic/app —— 平台品牌信息（公开，供 C 端/管理端动态展示）
+     *
+     * 键：system_configs 的 app.name / app.logo / app.home_banner /
+     *     app.hero_title_1 / app.hero_title_2 / app.hero_subtitle（后台「运营参数」页可改）。
+     * 未配置时回退默认值；logo/home_banner 为空表示前端用内置默认图。
+     */
+    public function app()
+    {
+        return [
+            'app_name'      => \app\service\SystemConfigService::get('app.name', '臻海艺术'),
+            'app_logo'      => \app\service\SystemConfigService::get('app.logo', ''),
+            'home_banner'   => \app\service\SystemConfigService::get('app.home_banner', ''),
+            'hero_title_1'  => \app\service\SystemConfigService::get('app.hero_title_1', '让热爱'),
+            'hero_title_2'  => \app\service\SystemConfigService::get('app.hero_title_2', '奔赴更大的世界'),
+            'hero_subtitle' => \app\service\SystemConfigService::get('app.hero_subtitle', '数字艺术·收藏·交易·共建'),
+        ];
+    }
+
+    /**
      * GET /basic/banner —— 首页轮播
      *
      * 源站按 position 分区返回；不传position 时返回全部启用中的。

@@ -75,7 +75,7 @@
         <!-- 协议 -->
         <div class="agreement">
           <img class="agree-icon" :src="agreeProtocol ? IMG.agree : IMG.agreeOff" alt="" @click="toggleAgreement" />
-          <span style="font-size: 12px; color: rgb(136, 144, 162); margin-left: 0.375rem">我已同意臻海艺术平台</span>
+          <span style="font-size: 12px; color: rgb(136, 144, 162); margin-left: 0.375rem">我已同意{{ brand.name }}平台</span>
           <span class="link" @click="navigateToService">《服务协议》</span>
           <span class="link" @click="navigateToPrivacy">《隐私政策》</span>
         </div>
@@ -97,6 +97,7 @@ import UvIcon from '@/components/UvIcon.vue'
 import { signinWithPassword } from '@/api'
 import { storage, TOKEN_KEY } from '@/utils/storage'
 import { showLoading, hideLoading } from '@/api/request'
+import { brand } from '@/api/request'
 
 import bgImg from '@/assets/signin/bg.jpg'
 import backImg from '@/assets/signin/back.png'

@@ -29,11 +29,22 @@ Route::group('admin', function () {
         Route::get('users/:id', 'admin/Users/detail')->pattern(['id' => '\d+']);
         Route::post('users/:id/status', 'admin/Users/status')->pattern(['id' => '\d+']);
 
+        Route::get('cleanup/summary', 'admin/Cleanup/summary');
+        Route::post('cleanup/users', 'admin/Cleanup/users');
+        Route::post('cleanup/platform', 'admin/Cleanup/platform');
+
         Route::get('items', 'admin/Items/index');
         Route::get('items/meta', 'admin/Items/meta');
         Route::post('items', 'admin/Items/create');
+        Route::post('items/:id/onsale', 'admin/Items/onsale')->pattern(['id' => '\d+']);
+        Route::post('items/:id/offsale', 'admin/Items/offsale')->pattern(['id' => '\d+']);
         Route::get('items/:id', 'admin/Items/detail')->pattern(['id' => '\d+']);
         Route::put('items/:id', 'admin/Items/update')->pattern(['id' => '\d+']);
+
+        Route::get('categories', 'admin/Categories/index');
+        Route::post('categories', 'admin/Categories/create');
+        Route::put('categories/:id', 'admin/Categories/update')->pattern(['id' => '\d+']);
+        Route::delete('categories/:id', 'admin/Categories/delete')->pattern(['id' => '\d+']);
 
         Route::get('activity/lotteries', 'admin/Activity/lotteries');
         Route::post('activity/lotteries', 'admin/Activity/lotterySave');

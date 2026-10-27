@@ -55,6 +55,7 @@ Route::group(function () {
     Route::get('nft/digitalAlbum/calendar', 'Nft/digitalAlbumCalendar');
 
     /* ---------- 基础内容 ---------- */
+    Route::get('basic/app', 'Basic/app');
     Route::get('basic/banner', 'Basic/banner');
     Route::get('basic/configs', 'Basic/configs');
     Route::get('basic/notice', 'Basic/noticeList');

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { reactive } from 'vue'
 
 /**
  * 管理后台请求层
@@ -97,6 +98,25 @@ export function bindKick(fn) {
   router_kick = fn
 }
 
+/* ---------- 平台品牌（全局响应式） ---------- */
+
+/**
+ * brand：平台名/logo 全局状态。
+ * main.js 启动时调 loadBrand()（GET /basic/app，公开接口，登录前也能显示）；
+ * 「运营参数」页保存 app.name / app.logo 后调 refreshBrand() 即时生效。
+ */
+export const brand = reactive({ name: '臻海艺术', logo: '' })
+
+export async function loadBrand() {
+  try {
+    const d = await http.get('/basic/app')
+    if (d?.data?.app_name) brand.name = String(d.data.app_name)
+    brand.logo = String(d?.data?.app_logo || '')
+  } catch {
+    /* 拉不到就用默认值 */
+  }
+}
+
 /* ---------- 通用格式化 ---------- */
 
 /** 时间显示：兼容 datetime 字符串与 13 位毫秒时间戳 */
@@ -118,6 +138,11 @@ export function fmtTime(v) {
 
 export function money(v) {
   return Number(v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+}
+
+/** 分 → 元：库里与 API 金额全链路为「分」（源站语义，C 端 /100 显示），后台展示时转元 */
+export function toYuan(v) {
+  return Number(v || 0) / 100
 }
 
 /** 订单类型（后端 Order.php TYPE_* 常量） */

@@ -170,9 +170,10 @@ class Order extends Base
             throw ApiException::notFound();
         }
         $item = $item->toArray();
+        $this->ensureOnSale($item);
 
-        $unitPrice = (int)$item['price'];       // 源站 price 单位是「元」
-        $amount    = $unitPrice * 100 * $quantity; // 订单金额单位是「分」
+        $unitPrice = (int)$item['price'];       // price 单位是「分」，与订单金额同单位，原样存取不换算
+        $amount    = $unitPrice * $quantity;
 
         $now = $this->nowMillis();
 
@@ -224,7 +225,7 @@ class Order extends Base
         $itemArr = $item ? $item->toArray() : [];
 
         $unitPrice = (int)$nft['price'];
-        $amount    = (int)$nft['buy_price'] > 0 ? (int)$nft['buy_price'] : $unitPrice * 100;
+        $amount    = (int)$nft['buy_price'] > 0 ? (int)$nft['buy_price'] : $unitPrice;
 
         $now = $this->nowMillis();
 
@@ -331,7 +332,7 @@ class Order extends Base
             }
             $nft = $nft->toArray();
 
-            $amount = (int)$nft['buy_price'] > 0 ? (int)$nft['buy_price'] : (int)$nft['price'] * 100;
+            $amount = (int)$nft['buy_price'] > 0 ? (int)$nft['buy_price'] : (int)$nft['price'];
 
             $order = OrderModel::create([
                 'uid'           => $uid,
@@ -397,9 +398,10 @@ class Order extends Base
             throw ApiException::notFound();
         }
         $item = $item->toArray();
+        $this->ensureOnSale($item);
 
         $quantity = (int)($this->body()['quantity'] ?? 1);
-        $amount   = (int)$item['price'] * 100 * max(1, $quantity);
+        $amount   = (int)$item['price'] * max(1, $quantity);
         $now      = $this->nowMillis();
 
         $order = OrderModel::create([
@@ -427,6 +429,24 @@ class Order extends Base
     }
 
     /**
+     * 一级市场开售校验：status=1 且到发售时间才可下单
+     *
+     * 覆盖 primary（直购）/ secondaryApply（申购）两个一级入口；
+     * 未开售藏品直链下单会被拒绝，与 C 端列表/详情过滤保持一致。
+     * 注意 items.status 走模型 integer cast，这里收到的已是 int。
+     */
+    private function ensureOnSale(array $item): void
+    {
+        if ((int)($item['status'] ?? 0) !== 1) {
+            throw ApiException::notFound('藏品未开售');
+        }
+        $st = (int)($item['start_time'] ?? 0);
+        if ($st > 0 && $st > $this->nowMillis()) {
+            throw new ApiException('藏品未到开售时间', ApiException::CODE_PARAM_TYPE);
+        }
+    }
+
+    /**
      * POST /order/secondary/trust —— 委托（求购）下单
      *
      * 委托单落nft_market_trust_orders，不是 orders 表——
@@ -445,7 +465,7 @@ class Order extends Base
         $item = $item->toArray();
 
         $quantity = max(1, (int)($body['quantity'] ?? 1));
-        $price    = (int)($body['unitPrice'] ?? $item['price'] * 100);
+        $price    = (int)($body['unitPrice'] ?? $item['price']);
         $now      = $this->nowMillis();
 
         $row = NftMarketTrustOrder::create([

@@ -25,7 +25,8 @@ class Cms extends AdminBase
 
         $data = $this->adminPage($q);
         $cids = array_values(array_unique(array_column($data['list'], 'cid')));
-        $cats = $cids === [] ? [] : \think\facade\Db::name('notice_categories')->whereIn('id', $cids)->column('name', 'id');
+        // 分类列按雪花 cid 关联（与 C 端 composeNotice 一致）
+        $cats = $cids === [] ? [] : \think\facade\Db::name('notice_categories')->whereIn('cid', $cids)->column('name', 'cid');
         foreach ($data['list'] as &$r) {
             $r['id']       = (string)$r['id'];
             $r['cid']      = (string)$r['cid'];
@@ -83,8 +84,14 @@ class Cms extends AdminBase
             throw ApiException::missing('title');
         }
 
+        $cid = (int)($body['cid'] ?? 0);
+        // 校验分类有效性（按雪花 cid）：脏 cid 会让 C 端 category=null 导致公告页渲染报错
+        if ($cid > 0 && !\think\facade\Db::name('notice_categories')->where('cid', $cid)->where('is_deleted', 0)->find()) {
+            throw new ApiException('公告分类不存在，请重新选择', ApiException::CODE_PARAM_TYPE);
+        }
+
         $fields = [
-            'cid'          => (int)($body['cid'] ?? 0),
+            'cid'          => $cid,
             'title'        => $title,
             'content'      => (string)($body['content'] ?? ''),
             'cover'        => (string)($body['cover'] ?? ''),
@@ -170,10 +177,21 @@ class Cms extends AdminBase
         return ['ok' => true];
     }
 
+    /**
+     * GET /admin/cms/notice-categories —— 公告分类下拉
+     *
+     * ⚠️ 返回 cid（雪花 ID）而非自增主键 id：notices.cid 存的是分类雪花 ID，
+     * C 端 composeNotice 按 cid 关联。此前下拉绑定自增 id（1-5），
+     * 保存后 C 端查不到分类 → category=null → C 端公告页白屏。
+     */
     public function noticeCategories()
     {
         return ['list' => \think\facade\Db::name('notice_categories')
-            ->where('is_deleted', 0)->field('id,name')->select()->toArray()];
+            ->where('is_deleted', 0)
+            ->field('cid,name')
+            ->order('sort', 'asc')
+            ->select()
+            ->toArray()];
     }
 
     /* ---------- 轮播 ---------- */

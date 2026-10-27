@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { reactive } from 'vue'
 import { showToast } from 'vant'
 import * as uiLoading from '@/utils/loading'
 import { storage, TOKEN_KEY, BG_IMG_KEY } from '@/utils/storage'
@@ -76,6 +77,37 @@ export const BASE_URL = resolveBaseUrl()
 export const FRONT_URL = window.location.origin
 export const WSS_URL = 'wss://im.shengtai.cyou/ws' // 遗留常量，暂无调用方；IM 服务自建后替换
 export const APP_NAME = '臻海艺术'
+
+/**
+ * 平台品牌（全局响应式）：启动时 GET /basic/app 拉取（公开接口）。
+ * 后台「运营参数 → 平台品牌」修改 app.name / app.logo / app.home_banner /
+ * app.hero_title_1 / app.hero_title_2 / app.hero_subtitle 后，
+ * C 端刷新即生效——首页 logo 字、主视觉大图、主副标题、关于页、证书、协议文案、标题栏等全部展示位。
+ */
+export const brand = reactive({
+  name: APP_NAME,
+  logo: '',
+  banner: '',
+  heroTitle1: '让热爱',
+  heroTitle2: '奔赴更大的世界',
+  heroSubtitle: '数字艺术·收藏·交易·共建',
+})
+
+export async function loadBrand() {
+  try {
+    const res = await fetch(`${BASE_URL}/basic/app`)
+    const json = await res.json()
+    const d = json?.data || {}
+    if (d.app_name) brand.name = String(d.app_name)
+    brand.logo = String(d.app_logo || '')
+    brand.banner = String(d.home_banner || '')
+    brand.heroTitle1 = String(d.hero_title_1 || brand.heroTitle1)
+    brand.heroTitle2 = String(d.hero_title_2 || brand.heroTitle2)
+    brand.heroSubtitle = String(d.hero_subtitle || brand.heroSubtitle)
+  } catch {
+    /* 拉不到保持默认 */
+  }
+}
 
 /** 当前是否连本地后端（调试用：控制台 shengtaiApi.isLocal()） */
 export function isLocalApi() {

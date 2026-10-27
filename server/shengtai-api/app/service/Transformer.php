@@ -162,8 +162,8 @@ final class Transformer
             'token'         => (int)($row['token'] ?? 0),
             'status'        => (int)($row['status'] ?? 0),
             'getTime'       => self::ts($row['get_time'] ?? 0),
-            'price'         => (int)($row['price'] ?? 0),
-            'buyPrice'      => (int)($row['buy_price'] ?? 0),
+            'price'         => (int)round((float)($row['price'] ?? 0)),
+            'buyPrice'      => (int)round((float)($row['buy_price'] ?? 0)),
             'payLock'       => (bool)($row['pay_lock'] ?? false),
             // 源站实测可返回 null，不要转 0
             'payWay'        => $row['pay_way'] === null ? null : (int)$row['pay_way'],
@@ -197,12 +197,12 @@ final class Transformer
             'status'        => (int)($order['status'] ?? 0),
             'getTime'       => self::ts($nft['get_time'] ?? 0),
             // ⚠️ price 是【挂售价】，覆盖 NFT 自身的 price 列
-            'price'         => (int)($order['price'] ?? 0),
+            'price'         => (int)round((float)($order['price'] ?? 0)),
             'payLock'       => (bool)($nft['pay_lock'] ?? false),
             'payWay'        => $nft['pay_way'] === null ? null : (int)$nft['pay_way'],
             'chainId'       => (string)($nft['chain_id'] ?? ''),
             'chainCompleted'=> (bool)($nft['chain_completed'] ?? false),
-            'buyPrice'      => (int)($nft['buy_price'] ?? 0),
+            'buyPrice'      => (int)round((float)($nft['buy_price'] ?? 0)),
             // 列表态固定值（源站实测）
             'item'          => null,
             'owner'         => null,
@@ -235,7 +235,7 @@ final class Transformer
             // ⚠️ 源站 content 为 NULL 时原样返回 null（不是空串）。
             //    强转 (string) 会把 null 变 ''，破坏与源站的逐字段一致性。
             'content'                => $row['content'] ?? null,
-            'price'                  => (int)$row['price'],
+            'price'                  => (int)round((float)$row['price']),
             'type'                   => (int)($row['type'] ?? 0),
             'issueQuantity'          => (int)($row['issue_quantity'] ?? 0),
             'buyQuantity'            => (int)($row['buy_quantity'] ?? 0),

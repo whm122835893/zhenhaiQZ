@@ -38,7 +38,7 @@
             <img class="logo" :src="IMG.logo" alt="" />
             <div class="nameTime">
               <div class="nameRow">
-                <span class="name">臻海艺术先锋发布官</span>
+                <span class="name">{{ brand.name }}先锋发布官</span>
               </div>
               <span class="time">{{ timeFormat(item.createTime) }}</span>
             </div>
@@ -47,7 +47,7 @@
         </div>
         <div class="nameTag">
           <div class="tagBox">
-            <div class="tag">{{ item.category.name.slice(0, 2) }}</div>
+            <div class="tag">{{ item.category?.name?.slice(0, 2) || '公告' }}</div>
           </div>
           <div class="title">{{ item.title }}</div>
         </div>
@@ -79,6 +79,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { basicApi } from '@/api'
+import { brand } from '@/api/request'
 
 import bgImg from '@/assets/notice/bg.png'
 import logoImg from '@/assets/notice/logo.jpg'

@@ -29,8 +29,8 @@
 
     <div class="content">
       <div class="logo-box">
-        <img class="logo" :src="logo" alt="" />
-        <span class="app-name">臻海艺术</span>
+        <img class="logo" :src="brand.logo || logo" alt="" />
+        <span class="app-name">{{ brand.name }}</span>
       </div>
 
       <div class="item" @click="copyEmail">
@@ -57,7 +57,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast, copy } from '@/api/request'
+import { showToast, copy, brand } from '@/api/request'
 import logo from '@/assets/my/logo.jpg'
 import copyIcon from '@/assets/my/about-copy-icon.png'
 

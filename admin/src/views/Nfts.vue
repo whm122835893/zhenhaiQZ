@@ -28,7 +28,7 @@
                 </div>
               </td>
               <td>{{ r.nickname }}</td>
-              <td class="serif-num">¥{{ money(r.price) }}</td>
+              <td class="serif-num">¥{{ money(toYuan(r.price)) }}</td>
               <td><span class="tag" :class="Number(r.sell_status) === 1 ? 'tag-orange' : 'tag-gray'">{{ Number(r.sell_status) === 1 ? '寄售中' : '未寄售' }}</span></td>
               <td class="cell-sub">{{ fmtTime(r.created_at) }}</td>
             </tr>
@@ -45,7 +45,7 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import http, { fmtTime, money } from '../api'
+import http, { fmtTime, money, toYuan } from '../api'
 import Pager from '../components/Pager.vue'
 
 const q = reactive({ keyword: '', sellStatus: '', pageNo: 1, pageSize: 20 })

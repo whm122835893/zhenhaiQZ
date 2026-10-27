@@ -226,7 +226,7 @@ CREATE TABLE `items` (
   `is_pre`                   tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否处于预热期',
   `view_count`               int NOT NULL DEFAULT 0,
   `follower_count`           int NOT NULL DEFAULT 0,
-  `status`                   varchar(32) NOT NULL DEFAULT 'on',
+  `status`                   varchar(32) NOT NULL DEFAULT '0' COMMENT '上架状态 1在售 0未发售(模型有integer cast,勿存on/off等字符串)',
   `created_at`               datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`               datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted`               tinyint(1) NOT NULL DEFAULT 0,

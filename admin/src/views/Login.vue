@@ -7,8 +7,9 @@
 
     <form class="glass login-card pop" @submit.prevent="submit">
       <div class="login-brand">
-        <div class="logo">臻</div>
-        <h1>臻海艺术</h1>
+        <img v-if="brand.logo" class="logo" :src="brand.logo" alt="logo" style="object-fit:cover" />
+        <div v-else class="logo">{{ brand.name.slice(0, 1) }}</div>
+        <h1>{{ brand.name }}</h1>
         <p>ZHENHAI ART ADMIN</p>
       </div>
 
@@ -32,7 +33,7 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import http, { toast, setToken, setProfile } from '../api'
+import http, { toast, setToken, setProfile, brand } from '../api'
 
 const router = useRouter()
 const form = reactive({ username: '', password: '' })

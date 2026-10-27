@@ -29,13 +29,18 @@ class Item extends Base
 {
     /**
      * GET /item —— 藏品列表
+     *
+     * 开售即显示：status=1 全部返回（含已排期待开售的）。
+     * 排期中（start_time > now）藏品在 C 端详情页显示倒计时（buyTime），
+     * 到点后方可下单（Order 侧校验 start_time<=now）。
      */
     public function index()
     {
         $pageNo   = $this->pageNo();
         $pageSize = $this->pageSize();
 
-        $query = ItemModel::where('is_deleted', 0);
+        $query = ItemModel::where('is_deleted', 0)
+            ->where('status', 1);
 
         if (($cid = $this->str('cid')) !== '') {
             $query->where('cid', $cid);
@@ -60,10 +65,14 @@ class Item extends Base
 
     /**
      * GET /item/category —— 分类列表
+     *
+     * 仅返回启用中的分类；后台删除/停用后 C 端市场页 tab 同步消失。
      */
     public function category()
     {
-        $rows = ItemCategory::order('sort', 'asc')->order('id', 'asc')->select()->toArray();
+        $rows = ItemCategory::where('status', 'enabled')
+            ->order('sort', 'asc')->order('id', 'asc')
+            ->select()->toArray();
         return array_map([Transformer::class, 'category'], $rows);
     }
 
@@ -144,7 +153,10 @@ class Item extends Base
      */
     public function detail(string $iid)
     {
-        $item = ItemModel::where('iid', $iid)->where('is_deleted', 0)->find();
+        // 开售即显示：排期中（start_time>now）也可见，详情页按 buyTime 展示倒计时
+        $item = ItemModel::where('iid', $iid)->where('is_deleted', 0)
+            ->where('status', 1)
+            ->find();
         if ($item === null) {
             throw \app\exception\ApiException::notFound();
         }

@@ -57,3 +57,4 @@ __pycache__/
 
 # vite 依赖预构建缓存（不应入库，可由 vite 自动重建）
 .vite/
+/public/admin/

@@ -16,7 +16,13 @@ INSERT INTO `system_configs` (`config_key`, `config_value`, `remark`) VALUES
   ('invite.reward_iid',         '0',      '邀请好友奖励藏品ID（items.id）'),
   ('invite.reward_qty',         '1',      '邀请好友奖励藏品数量'),
   ('invite.settle_timing',      'register','邀请奖励结算时机（register=注册即发 first_order=首单支付后）'),
-  ('activity.sign_milestones',  '',       '签到里程碑空投 CSV（连续天:items.id:数量），空=不启用')
+  ('activity.sign_milestones',  '',       '签到里程碑空投 CSV（连续天:items.id:数量），空=不启用'),
+  ('app.name',                  '臻海艺术','平台品牌名（C 端/后台所有展示位读取）'),
+  ('app.logo',                  '',       '平台 logo 图片地址（后台「运营参数-平台品牌」上传）'),
+  ('app.home_banner',           '',       'C 端首页主视觉大图（后台「运营参数-平台品牌」上传，空=内置默认图）'),
+  ('app.hero_title_1',          '让热爱',  'C 端首页主标题第一行'),
+  ('app.hero_title_2',          '奔赴更大的世界','C 端首页主标题第二行'),
+  ('app.hero_subtitle',         '数字艺术·收藏·交易·共建','C 端首页副标题')
 ON DUPLICATE KEY UPDATE `remark` = VALUES(`remark`);
 -- 邀请奖励已取消余额通道，清理历史配置键
 DELETE FROM `system_configs` WHERE `config_key` IN ('invite.reward_type', 'invite.reward_amount');

@@ -15,10 +15,14 @@
       <div class="tbl-wrap">
         <table class="tbl">
           <thead>
-            <tr><th>ID</th><th>用户</th><th>手机号</th><th>邮箱</th><th>实名</th><th>邀请码</th><th>状态</th><th>最近登录</th><th>注册时间</th><th>操作</th></tr>
+            <tr>
+              <th style="width:36px"><input type="checkbox" :checked="allChecked" @change="toggleAll" /></th>
+              <th>ID</th><th>用户</th><th>手机号</th><th>邮箱</th><th>实名</th><th>邀请码</th><th>状态</th><th>最近登录</th><th>注册时间</th><th>操作</th>
+            </tr>
           </thead>
           <tbody>
             <tr v-for="u in list" :key="u.id">
+              <td><input type="checkbox" :checked="selected.has(u.id)" @change="toggleSel(u.id)" /></td>
               <td class="cell-sub serif-num">{{ u.id }}</td>
               <td>
                 <div class="cell-main">{{ u.nickname }}</div>
@@ -38,14 +42,20 @@
                           :disabled="busy === u.id" @click="toggleStatus(u)">
                     {{ u.status === 'normal' ? '禁用' : '启用' }}
                   </button>
+                  <button v-if="canWrite()" class="btn btn-danger btn-sm" :disabled="busy === u.id" @click="removeUsers([u], u.nickname)">删除</button>
                 </div>
               </td>
             </tr>
             <tr v-if="!loading && list.length === 0">
-              <td colspan="10"><div class="empty"><div class="glyph">🫧</div>没有符合条件的用户</div></td>
+              <td colspan="11"><div class="empty"><div class="glyph">🫧</div>没有符合条件的用户</div></td>
             </tr>
           </tbody>
         </table>
+      </div>
+      <div v-if="selected.size > 0" style="display:flex;align-items:center;gap:12px;margin-top:12px">
+        <span class="cell-sub">已选 <b class="serif-num">{{ selected.size }}</b> 个用户</span>
+        <button class="btn btn-danger btn-sm" :disabled="busy === 'batch'" @click="removeUsers([...selected].map(id => ({ id })), `已选 ${selected.size} 个用户`)">批量删除</button>
+        <button class="btn btn-ghost btn-sm" @click="selected.clear()">取消选择</button>
       </div>
       <Pager :total="total" :page="q.pageNo" :size="q.pageSize" @change="p => load(p)" />
     </div>
@@ -82,7 +92,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import http, { toast, fmtTime, money, canWrite } from '../api'
 import Pager from '../components/Pager.vue'
 
@@ -92,6 +102,29 @@ const total = ref(0)
 const loading = ref(true)
 const busy = ref('')
 const detail = ref(null)
+
+/* ---------- 多选删除 ---------- */
+const selected = reactive(new Set())
+const allChecked = computed(() => list.value.length > 0 && list.value.every(u => selected.has(u.id)))
+
+function toggleSel(id) {
+  selected.has(id) ? selected.delete(id) : selected.add(id)
+}
+function toggleAll() {
+  if (allChecked.value) list.value.forEach(u => selected.delete(u.id))
+  else list.value.forEach(u => selected.add(u.id))
+}
+async function removeUsers(users, label) {
+  const ids = users.map(u => String(u.id))
+  if (!confirm(`确认删除${label}？其持仓、订单、钱包等全部数据将一并硬删，不可恢复！`)) return
+  busy.value = 'batch'
+  try {
+    const d = await http.post('/cleanup/users', { user_ids: ids })
+    toast(`已删除 ${d.deleted} 个用户`)
+    ids.forEach(id => selected.delete(id))
+    await load()
+  } catch { /* 拦截器已 toast */ } finally { busy.value = '' }
+}
 
 async function load(page = q.pageNo) {
   q.pageNo = page

@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { storage, TOKEN_KEY } from '@/utils/storage'
+import { brand } from '@/api/request'
 
 /**
  * 路由表 —— 严格对齐原站 h5.shengtai.cyou
@@ -117,10 +118,10 @@ const router = createRouter({
   scrollBehavior: () => ({ top: 0 }),
 })
 
-/** 与原站一致：设置 document.title */
+/** 与原站一致：设置 document.title（平台名随后台「平台品牌」动态变化） */
 router.afterEach((to) => {
   const t = to.meta && to.meta.title
-  document.title = t ? (t === '臻海艺术' ? t : t) : APP_TITLE_FALLBACK
+  document.title = t && t !== APP_TITLE_FALLBACK ? t : brand.name
 })
 
 const APP_TITLE_FALLBACK = '臻海艺术'

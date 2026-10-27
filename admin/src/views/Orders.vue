@@ -25,7 +25,7 @@
               <td>{{ o.nickname }}</td>
               <td><span class="tag tag-blue">{{ ORDER_TYPE[o.order_type] || o.order_type }}</span></td>
               <td class="serif-num">×{{ o.quantity }}</td>
-              <td class="serif-num">¥{{ money(o.amount) }}</td>
+              <td class="serif-num">¥{{ money(toYuan(o.amount)) }}</td>
               <td class="cell-sub">{{ payWayText(o.pay_way) }}</td>
               <td><span class="tag" :class="statusCls(o.status)">{{ ORDER_STATUS[o.status] || o.status }}</span></td>
               <td class="cell-sub">{{ fmtTime(o.payTime) }}</td>
@@ -66,8 +66,8 @@
             <div><span class="od-k">类型</span><span class="od-v">{{ ORDER_TYPE[detail.order_type] || detail.order_type }}</span></div>
             <div><span class="od-k">买家</span><span class="od-v">{{ detail.nickname }}（{{ detail.uid }}）</span></div>
             <div><span class="od-k">卖家</span><span class="od-v">{{ detail.sellerNickname || (detail.sellerUid !== '0' ? detail.sellerUid : '平台') }}</span></div>
-            <div><span class="od-k">单价</span><span class="od-v serif-num">¥{{ money(detail.unitPrice) }}</span></div>
-            <div><span class="od-k">总额</span><span class="od-v serif-num">¥{{ money(detail.amount) }} × {{ detail.quantity }}</span></div>
+            <div><span class="od-k">单价</span><span class="od-v serif-num">¥{{ money(toYuan(detail.unitPrice)) }}</span></div>
+            <div><span class="od-k">总额</span><span class="od-v serif-num">¥{{ money(toYuan(detail.amount)) }} × {{ detail.quantity }}</span></div>
             <div><span class="od-k">状态</span><span class="tag" :class="statusCls(detail.status)">{{ ORDER_STATUS[detail.status] || detail.status }}</span></div>
             <div><span class="od-k">下单时间</span><span class="od-v">{{ fmtTime(detail.created_at) }}</span></div>
             <div><span class="od-k">支付时间</span><span class="od-v">{{ fmtTime(detail.pay_time) || '未支付' }}</span></div>
@@ -84,7 +84,7 @@
               <tr v-for="(n, i) in detail.nftItems" :key="i">
                 <td class="cell-sub" style="font-size:12px">{{ n.nftId }}</td>
                 <td class="serif-num">#{{ n.token }}</td>
-                <td class="serif-num">¥{{ money(n.amount) }}</td>
+                <td class="serif-num">¥{{ money(toYuan(n.amount)) }}</td>
                 <td class="cell-sub">{{ n.currentUid ?? '未分配' }}</td>
                 <td><span class="tag tag-gray">{{ NFT_SELL_STATUS[n.sellStatus] ?? '未知' }}</span></td>
               </tr>
@@ -101,7 +101,7 @@
               <tr v-for="p in detail.payments" :key="p.id">
                 <td>{{ payWayName(p.channel) }}</td>
                 <td class="cell-sub" style="font-size:12px">{{ p.tradeNo || '—' }}</td>
-                <td class="serif-num">¥{{ money(p.amount) }}</td>
+                <td class="serif-num">¥{{ money(toYuan(p.amount)) }}</td>
                 <td><span class="tag" :class="p.status === 'paid' ? 'tag-green' : 'tag-orange'">{{ p.status }}</span></td>
                 <td class="cell-sub">{{ p.paidAt || '—' }}</td>
               </tr>
@@ -115,7 +115,7 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import http, { toast, fmtTime, money, canWrite, canSuper, ORDER_TYPE, ORDER_STATUS } from '../api'
+import http, { toast, fmtTime, money, toYuan, canWrite, canSuper, ORDER_TYPE, ORDER_STATUS } from '../api'
 import Pager from '../components/Pager.vue'
 
 const q = reactive({ keyword: '', status: '', pageNo: 1, pageSize: 20 })
@@ -152,7 +152,7 @@ async function openDetail(o) {
 }
 
 async function forceCancel(o) {
-  const reason = prompt(`强制取消订单 ${o.id}（¥${money(o.amount)}）\n请输入取消原因（记入操作日志）：`, '客服处理')
+  const reason = prompt(`强制取消订单 ${o.id}（¥${money(toYuan(o.amount))}）\n请输入取消原因（记入操作日志）：`, '客服处理')
   if (reason === null) return
   try {
     await http.post(`/orders/${o.id}/cancel`, { reason })
@@ -162,7 +162,7 @@ async function forceCancel(o) {
 }
 
 async function markPaid(o) {
-  const reason = prompt(`将订单 ${o.id} 标记为已支付（¥${money(o.amount)}，仅超管，线下补单）\n请输入补单原因（记入操作日志）：`, '线下已收款')
+  const reason = prompt(`将订单 ${o.id} 标记为已支付（¥${money(toYuan(o.amount))}，仅超管，线下补单）\n请输入补单原因（记入操作日志）：`, '线下已收款')
   if (reason === null) return
   try {
     await http.post(`/orders/${o.id}/mark-paid`, { reason })

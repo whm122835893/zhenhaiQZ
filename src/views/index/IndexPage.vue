@@ -2,15 +2,15 @@
   <div class="page-container">
     <!-- ============ HERO ============ -->
     <div class="hero">
-      <img class="hero-fallback" :src="heroImg" alt="" />
+      <img class="hero-fallback" :src="brand.banner || heroImg" alt="" />
       <div class="hero-mask" />
 
       <!-- 顶部栏 -->
       <div class="topbar">
         <div class="topbar-row">
           <div class="logo-badge">
-            <img class="logo-whale" :src="logoWhale" alt="臻海" />
-            <span class="logo-text">臻海</span>
+            <img class="logo-whale" :src="brand.logo || logoWhale" :alt="brand.name" />
+            <span class="logo-text">{{ brand.name }}</span>
           </div>
           <div class="action-icons">
             <div class="act-btn" @click="goSearch">
@@ -25,10 +25,10 @@
       </div>
 
       <div class="hero-title">
-        <span class="hero-title-line">让热爱</span>
-        <span class="hero-title-line">奔赴更大的世界</span>
+        <span class="hero-title-line">{{ brand.heroTitle1 }}</span>
+        <span class="hero-title-line">{{ brand.heroTitle2 }}</span>
       </div>
-      <span class="hero-sub">数字艺术·收藏·交易·共建</span>
+      <span class="hero-sub">{{ brand.heroSubtitle }}</span>
 
       <div class="hero-btn" @click="go2digitalAlbum">
         <span class="hero-btn-text">查看更多</span>
@@ -118,7 +118,7 @@
     <!-- ============ 社区入口 ============ -->
     <div class="community" @click="go2Group">
       <img class="community-img" :src="communityImg" alt="" />
-      <span class="community-title">加入臻海社区</span>
+      <span class="community-title">加入{{ brand.name }}社区</span>
       <span class="community-sub">与更多热爱者同行</span>
       <img class="community-arrow" :src="iconArrowCircle" alt="" />
       <div class="community-note">
@@ -136,6 +136,7 @@
 <script>
 import { defineComponent } from 'vue'
 import { itemApi, basicApi } from '@/api'
+import { brand } from '@/api/request'
 import { baseUrl } from '@/utils/path'
 import { uni } from '@/utils/uni'
 import heroImg from '@/assets/inline/hero-CTQK3Xwo.jpg'
@@ -157,6 +158,10 @@ import qaMore from '@/assets/tabbar/qa-more.png'
 
 export default defineComponent({
   name: 'IndexPage',
+  computed: {
+    /** 平台品牌（全局响应式）：logo 字/社区标题随后台「平台品牌」动态变化 */
+    brand: () => brand,
+  },
   data() {
     return {
       heroImg,

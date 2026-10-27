@@ -15,7 +15,9 @@ class ItemCategory extends BaseModel
 
     protected $type = [
         'sort' => 'integer',
-        'status' => 'integer',
+        // status 是字符串枚举（enabled/disabled），不能声明 integer cast——
+        // 否则 where('status','enabled') 的值会被强转 0，
+        // MySQL 里 varchar 与 0 比较时 'enabled'/'disabled' 都转成 0，过滤失效
     ];
 
     protected $allowField = [

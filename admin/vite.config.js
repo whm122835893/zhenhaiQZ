@@ -3,6 +3,8 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
+  // base 相对路径：build 产物可直接挂到任意子路径（如 C 端 dev server 的 /admin/）
+  base: './',
   server: {
     port: 5174,
     host: true,

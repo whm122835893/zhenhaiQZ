@@ -17,7 +17,7 @@
               <div class="creator-icon">
                 <img src="@/assets/market/creator-icon.png" alt="" />
               </div>
-              <span class="creator-name">{{ item.authorName || '臻海艺术' }}</span>
+              <span class="creator-name">{{ item.authorName || brand.name }}</span>
               <img class="arrow-right" style="width: 13px; height: 14px" src="@/assets/market/creator-arrow.png" alt="" />
             </div>
             <div class="header-btns">
@@ -528,6 +528,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { nftApi, orderApi, basicApi } from '@/api'
 import { showLoading, hideLoading } from '@/api/request'
+import { brand } from '@/api/request'
 import { amountFormatYen as amountFormat, chainFormat as fmtChainFormat, timeFormat } from '@/utils/fmt'
 import { encryptPassword } from '@/utils/crypto'
 import payTagImg from '@/assets/market/pay-tag.png'
