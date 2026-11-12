@@ -154,7 +154,7 @@ function goBack() {
 }
 
 function openImageCaptcha() {
-  if (!body.phone || body.phone.length !== 11) return showToast('请输入正确的手机号')
+  if (!body.phone || String(body.phone).length !== 11) return showToast('请输入正确的手机号')
   if (countdown.value > 0) return
   showCaptchaModal.value = true
 }

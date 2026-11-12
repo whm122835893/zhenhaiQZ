@@ -26,19 +26,16 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
-      // 本地后端代理：前端 BASE_URL 走 '/api'，开发期由 vite 转发，
-      // 完全规避跨域（生产环境后端与前端同域或由网关处理）。
-      //
-      // 改 path 时注意：后端路由表是按 api.shengtai.cyou 的真实路径定义的
-      // （如 /item、/order/{id}），没有 /api 前缀，所以这里要 rewrite 掉。
+      // BuildAdmin 后端（server/buildadmin，php think run 8787）。
+      // C 端接口本身就带 /api 前缀（/api/nft_collection/index），无需 rewrite。
       '/api': {
-        target: 'http://127.0.0.1:8921',
+        target: 'http://127.0.0.1:8787',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
-      // 藏品图等静态资源（/media/*）：dev 下转发给 API 静态根，生产由同域网关提供
-      '/media': {
-        target: 'http://127.0.0.1:8921',
+      // 后台静态资源（藏品封面 / 轮播图 /storage/...）：dev 下转发给后端，
+      // 生产由 nginx 同域反代 /api、/storage 到 server/buildadmin。
+      '/storage': {
+        target: 'http://127.0.0.1:8787',
         changeOrigin: true,
       },
     },

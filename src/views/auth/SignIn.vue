@@ -139,7 +139,7 @@ function togglePassword() {
 }
 function openImageCaptcha() {
   if (!body.phone) return showToast('手机号不能为空')
-  if (body.phone.length !== 11) return showToast('请输入正确的手机号')
+  if (String(body.phone).length !== 11) return showToast('请输入正确的手机号')
   if (countdown.value > 0) return
   showCaptchaModal.value = true
 }
@@ -173,7 +173,7 @@ function navigateToPrivacy() {
 
 async function signin() {
   if (!body.phone) return showToast('手机号不能为空')
-  if (body.phone.length !== 11) return showToast('请输入正确的手机号')
+  if (String(body.phone).length !== 11) return showToast('请输入正确的手机号')
   if (!body.password) return showToast('密码不能为空')
   if (!agreeProtocol.value) return showToast('请同意服务协议和隐私政策')
   showLoading()

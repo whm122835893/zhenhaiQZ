@@ -1,0 +1,1 @@
+import{k as e}from"./config-CBqp2Csq.js";var t=(t,n,r)=>[`gif`,`jpg`,`jpeg`,`bmp`,`png`,`webp`].includes(r)?t.full_url:e(r);export{t};

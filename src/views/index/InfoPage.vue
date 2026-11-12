@@ -140,6 +140,8 @@
               <span>{{ totalAmount }}</span>
             </div>
           </div>
+          <!-- 复刻补漏：原站弹窗底部有确认下单按钮（createOrder 此前未绑定） -->
+          <div class="buy-btn hot-sale" style="margin: 4px 12px 6px" @click="createOrder">立即购买</div>
         </div>
       </div>
     </template>

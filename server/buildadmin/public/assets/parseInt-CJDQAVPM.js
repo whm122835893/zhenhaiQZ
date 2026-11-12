@@ -1,0 +1,1 @@
+import{Pi as e,si as t}from"./config-CBqp2Csq.js";var n=/^\s+/,r=e.parseInt;function i(e,i,a){return a||i==null?i=0:i&&=+i,r(t(e).replace(n,``),i||0)}export{i as t};

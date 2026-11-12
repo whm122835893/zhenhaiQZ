@@ -1,0 +1,1 @@
+import{E as e}from"./config-CBqp2Csq.js";function t(){return e({url:`/admin/nft.Activity/index`,method:`get`})}function n(t){return e({url:`/admin/nft.Activity/toggle`,method:`post`,data:t})}export{n,t};
