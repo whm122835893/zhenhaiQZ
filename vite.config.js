@@ -32,8 +32,12 @@ export default defineConfig({
         target: 'http://127.0.0.1:8787',
         changeOrigin: true,
       },
-      // 后台静态资源（藏品封面 / 轮播图 /storage/...）：dev 下转发给后端，
-      // 生产由 nginx 同域反代 /api、/storage 到 server/buildadmin。
+      // 上传静态资源（藏品封面 / 轮播图 /storage/...，BuildAdmin 上传约定）：
+      // dev 下转发给后端，生产由网关（dist-server.cjs）/storage 反代。
+      // ⚠️ 不代理 /static：前后端都有 /static（C 端 model3d 等 10 个目录 vs
+      // BuildAdmin 管理后台静态），vite 代理优先于 public 目录，整段代理会
+      // 劫持 C 端 3D 播放器。后端 /static 只服务管理后台，管理后台直连后端
+      // 源（8787），无需经过前端源。也不代理 /media：后端无此目录。
       '/storage': {
         target: 'http://127.0.0.1:8787',
         changeOrigin: true,
