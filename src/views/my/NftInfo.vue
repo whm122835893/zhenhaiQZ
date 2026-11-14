@@ -12,7 +12,9 @@
       <div class="art3d-wrap">
         <div class="nbmv">
           <!-- ⚠️ 不传 orbit：%25 经预览网关二次解码成裸 % 导致请求构建失败，
-               index.html 内置默认 orbit='0deg 90deg 105%' 等效 -->
+               index.html 内置默认 orbit='0deg 90deg 105%' 等效。
+               背面品牌字由查看器自行 fetch /api/nft_setting/brand，URL 不带中文
+               （预览网关不接受非 ASCII query） -->
           <iframe
             class="nbmv__frame"
             src="/static/model3d/index.html?modelurl=%2Fstatic%2Fmodel3d%2Fmodel.gltf&applytexture=1&rot=1&delay=500&speed=200%25&autofront=1&touch=1"

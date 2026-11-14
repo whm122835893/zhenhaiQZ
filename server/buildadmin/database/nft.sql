@@ -524,7 +524,7 @@ INSERT INTO `admin_rule` (`pid`,`type`,`title`,`name`,`path`,`icon`,`menu_type`,
 -- ------------------------------------------------------------
 INSERT INTO `setting` (`name`,`group`,`title`,`value`,`createtime`,`updatetime`) VALUES
 ('site_logo','brand','平台Logo','/static/images/logo.png',UNIX_TIMESTAMP(),UNIX_TIMESTAMP()),
-('site_name','brand','平台名称','灵境数藏',UNIX_TIMESTAMP(),UNIX_TIMESTAMP()),
+('site_name','brand','平台名称','臻海艺术',UNIX_TIMESTAMP(),UNIX_TIMESTAMP()),
 ('sell_fee_rate','trade','寄售手续费率(%)','5',UNIX_TIMESTAMP(),UNIX_TIMESTAMP()),
 ('transfer_fee','trade','转赠手续费(元,0=免费)','0',UNIX_TIMESTAMP(),UNIX_TIMESTAMP()),
 ('order_auto_cancel','trade','订单自动取消(分钟)','15',UNIX_TIMESTAMP(),UNIX_TIMESTAMP()),

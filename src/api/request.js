@@ -107,8 +107,9 @@ export const WSS_URL = '' // IM 自建后替换（缺口功能已 stub）
 export const APP_NAME = '臻海艺术'
 
 /**
- * 平台品牌（全局响应式）：当前为固定品牌信息（BuildAdmin 侧无对应接口，
- * 属缺口功能 stub）。后续如需后台可配，可在 server/buildadmin 增加品牌配置接口。
+ * 平台品牌（全局响应式）：启动时从后端拉取（后台「运营参数 → 平台品牌」可配），
+ * 拉取失败保持默认值。展示位：首页 logo 字、社区标题、关于页、证书、
+ * 协议页、document.title 等（3D 模型背面贴图除外——烘焙在 gltf 里，静态）。
  */
 export const brand = reactive({
   name: APP_NAME,
@@ -120,7 +121,14 @@ export const brand = reactive({
 })
 
 export async function loadBrand() {
-  /* stub：固定品牌信息，保持默认值 */
+  try {
+    const res = await http.get('/nft_setting/brand')
+    const d = (res && res.data) || {}
+    if (d.name) brand.name = d.name
+    if (d.logo) brand.logo = d.logo
+  } catch (e) {
+    /* 网络/后端异常：保持默认品牌，页面不报错 */
+  }
 }
 
 /** 当前是否连本地后端（调试用：控制台 shengtaiApi.isLocal()） */

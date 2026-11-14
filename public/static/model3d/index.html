@@ -161,6 +161,28 @@
       // 贴图落位后再对正视角，保证第一帧看到的就是贴图面
       if (CONFIG.autoFront) alignToFace(mat);
     }).catch(function () { /* 错误已在各自内部上报 */ });
+
+    // 背面品牌字动态化：优先取 URL 的 backtext 参数（显式覆盖/独立调试用），
+    // 否则查看器自行 fetch 同源 /api/nft_setting/brand（后台「运营参数 →
+    // 平台品牌」可配）。不走 URL 传名的原因：预览网关不接受非 ASCII query，
+    // 中文编码参数会导致 iframe 请求 400。
+    // 字体大小固定 82px（按原烘焙字实测反推），超长名等比缩小保完整，
+    // 普通长度字号恒定。fetch 失败保持原烘焙贴图（臻海艺术）。
+    var backTextSource = P.backtext
+      ? Promise.resolve(P.backtext)
+      : fetch('/api/nft_setting/brand')
+          .then(function (r) { return r.json(); })
+          .then(function (j) { return (j && j.data && j.data.name) || ''; })
+          .catch(function () { return ''; });
+
+    backTextSource.then(function (name) {
+      if (!name) return;
+      var backMat = findBakedMaterial();
+      // 仅当背面材质与正面材质不是同一张脸时才贴，避免无空白面的模型被误覆盖
+      if (backMat && backMat !== mat) {
+        applyTextureTo(backMat, makeBackTexture(name));
+      }
+    });
   });
 
   mv.addEventListener('error', function (e) {
@@ -226,6 +248,58 @@
       if (!isDecorMaterial(mats[n].name)) return mats[n];
     }
     return mats[0];
+  }
+
+  /**
+   * 找「自带烘焙贴图」的主面（背面品牌字所在面）。
+   * 与 findDisplayMaterial 相反：找有 baseColorTexture 且非边框的材质。
+   */
+  function findBakedMaterial() {
+    if (!mv.model) return null;
+    var mats = mv.model.materials || [];
+    for (var i = 0; i < mats.length; i++) {
+      if (isDecorMaterial(mats[i].name)) continue;
+      if (hasBaseTexture(mats[i])) return mats[i];
+    }
+    return null;
+  }
+
+  /**
+   * 按原烘焙贴图规格重画背面：600×600、纯色 #414141 底、
+   * 白色粗体品牌名居中（原字实测：ink 宽 331px/4 字 → 字号 82px）。
+   * 字号固定，名字长度不影响大小；超长才等比缩小（下限 20px）。
+   */
+  function makeBackTexture(text) {
+    var c = document.createElement('canvas');
+    c.width = 600;
+    c.height = 600;
+    var x = c.getContext('2d');
+    x.fillStyle = '#414141';
+    x.fillRect(0, 0, 600, 600);
+    var size = 82;
+    var font = function (px) {
+      return 'bold ' + px + 'px "PingFang SC","Microsoft YaHei","Source Han Sans CN",sans-serif';
+    };
+    x.font = font(size);
+    var w = x.measureText(text).width;
+    if (w > 560) { // 两侧各留 20px 安全边
+      size = Math.max(20, Math.floor((size * 560) / w));
+      x.font = font(size);
+    }
+    x.fillStyle = '#ffffff';
+    x.textAlign = 'center';
+    // 光学居中：按墨迹包围盒（actualBoundingBox）定位，而不是 em 框中线 —
+    // CJK 字形在 em 框内偏上，middle 基线会导致整体偏高约 7px。
+    // 旧浏览器无 actualBoundingBox 时回退 middle 基线。
+    if (x.measureText('国').actualBoundingBoxAscent !== undefined) {
+      x.textBaseline = 'alphabetic';
+      var tm = x.measureText(text);
+      x.fillText(text, 300, 300 + (tm.actualBoundingBoxAscent - tm.actualBoundingBoxDescent) / 2);
+    } else {
+      x.textBaseline = 'middle';
+      x.fillText(text, 300, 300);
+    }
+    return c.toDataURL('image/png');
   }
 
   /* ------------------------------------------------------------------ *

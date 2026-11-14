@@ -29,7 +29,7 @@ class NftContent extends Frontend
      */
     public function banner(): void
     {
-        $rows = Db::name('banner')->where('status', 1)
+        $rows = Db::name('banner')->where('status', 1)->where('deletetime', 0)
             ->order('weigh', 'desc')->order('id', 'desc')
             ->field('id,title,image,link')
             ->select()->toArray();
@@ -49,7 +49,7 @@ class NftContent extends Frontend
 
         // 详情
         if ($id > 0) {
-            $row = Db::name('notice')->where('status', 1)->where('id', $id)->find();
+            $row = Db::name('notice')->where('status', 1)->where('deletetime', 0)->where('id', $id)->find();
             if (!$row) {
                 $this->error('公告不存在');
             }
@@ -62,7 +62,7 @@ class NftContent extends Frontend
         $cid   = (int) $this->request->get('category/d', 0);
         $title = trim((string) $this->request->get('title/s', ''));
 
-        $query = Db::name('notice')->where('status', 1);
+        $query = Db::name('notice')->where('status', 1)->where('deletetime', 0);
         if ($cid > 0) {
             $query->where('category', $cid);
         }
