@@ -32,13 +32,16 @@ export default defineConfig({
       // 改 path 时注意：后端路由表是按 api.shengtai.cyou 的真实路径定义的
       // （如 /item、/order/{id}），没有 /api 前缀，所以这里要 rewrite 掉。
       '/api': {
-        target: 'http://127.0.0.1:8921',
+        target: 'http://127.0.0.1:8787',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
       // 藏品图等静态资源（/media/*）：dev 下转发给 API 静态根，生产由同域网关提供
       '/media': {
-        target: 'http://127.0.0.1:8921',
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+      },
+      '/static': {
+        target: 'http://127.0.0.1:8787',
         changeOrigin: true,
       },
     },
